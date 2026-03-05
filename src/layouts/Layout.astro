@@ -1,0 +1,64 @@
+---
+import '../styles/global.css';
+
+const { title = 'Skills Portal', description = 'Portal interno de skills' } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="shell">
+        <div class="brand">Skills Portal</div>
+        <nav>
+          <a href="/">Inicio</a>
+          <a href="/skills">Skills</a>
+          <a href="/repos">Repos</a>
+        </nav>
+      </div>
+    </header>
+    <main class="shell">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="shell">Portal interno — estático y seguro.</div>
+    </footer>
+
+    <div id="page-loader" aria-hidden="true">
+      <div class="spinner" aria-label="Cargando"></div>
+      <p>Cargando...</p>
+    </div>
+
+    <script>
+      // Preloader para transiciones de página y clics en navegación.
+      const loader = document.getElementById('page-loader');
+      const showLoader = () => loader?.classList.add('visible');
+      const hideLoader = () => loader?.classList.remove('visible');
+
+      window.addEventListener('pageshow', hideLoader);
+      window.addEventListener('load', hideLoader);
+      window.addEventListener('beforeunload', showLoader);
+
+      document.addEventListener('click', (event) => {
+        const target = event.target as HTMLElement | null;
+        const anchor = target?.closest?.('a');
+        if (!anchor) return;
+
+        const href = anchor.getAttribute('href') || '';
+        const newTab = anchor.getAttribute('target') === '_blank';
+        const isAnchor = href.startsWith('#');
+        const isMail = href.startsWith('mailto:');
+        const isTel = href.startsWith('tel:');
+
+        if (newTab || isAnchor || isMail || isTel) return;
+        showLoader();
+      });
+    </script>
+  </body>
+</html>

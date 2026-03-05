@@ -1,0 +1,156 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { readReposConfig } from '../../lib/config';
+import { requireToken } from '../../lib/github';
+import { collectAllSkills } from '../../lib/skills';
+
+requireToken();
+const repos = readReposConfig();
+const skills = (await collectAllSkills(repos)).sort((a, b) => a.title.localeCompare(b.title));
+---
+<Layout title="Skills" description="Catálogo de skills">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Catálogo</p>
+      <h1>Skills en vivo desde GitHub</h1>
+      <p class="lede">Explora SKILL.md de todos los repos registrados. Filtra por título o tags y abre el detalle renderizado en server.</p>
+      <div class="pill-row">
+        <span class="pill">Cache 5m</span>
+        <span class="pill">Fetch autenticado</span>
+      </div>
+    </div>
+    <div class="search-card">
+      <p class="label">Filtrar</p>
+      <div class="search-box">
+        <input type="search" placeholder="Buscar skills por título o tag" oninput="filterSkills(event)" />
+      </div>
+      <p class="hint">El filtrado es local; los datos vienen en tiempo real.</p>
+    </div>
+  </section>
+
+  <section class="skills-grid" id="skills-grid">
+    {skills.map((skill) => (
+      <article class="skill-card" data-title={skill.title.toLowerCase()} data-tags={skill.tags.join(' ').toLowerCase()}>
+        <div class="skill-head">
+          <p class="repo">{skill.repoName || skill.repoId}</p>
+          <h3><a href={`/skills/${skill.id}`}>{skill.title}</a></h3>
+        </div>
+        <p class="skill-desc">{skill.description}</p>
+        <div class="tag-row">
+          {skill.tags.map((tag) => (
+            <span class="tag">{tag}</span>
+          ))}
+        </div>
+      </article>
+    ))}
+  </section>
+
+  <style>
+    :global(body) {
+      background: #07090f;
+      color: #e5e7eb;
+      font-family: "Space Grotesk", "Public Sans", system-ui, -apple-system, sans-serif;
+    }
+    :global(.site-header), :global(.site-footer) {
+      background: #0c101a;
+      border-color: rgba(255, 255, 255, 0.06);
+    }
+    :global(.site-header .brand) { color: #e5e7eb; }
+    :global(.site-header nav a) { color: #cbd5e1; }
+    :global(.site-header nav a:hover) { color: #e0f2fe; }
+    :global(main) { padding: 2rem 0 3rem; }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 1.5rem;
+      padding: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      background: radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.16), transparent 32%),
+        radial-gradient(circle at 90% 0%, rgba(168, 85, 247, 0.2), transparent 35%),
+        #0c101a;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    }
+    .eyebrow { text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.8rem; color: #a5b4fc; margin: 0 0 0.5rem; }
+    h1 { margin: 0; font-size: clamp(1.9rem, 3vw, 2.5rem); letter-spacing: -0.02em; }
+    .lede { color: #cbd5e1; margin: 0.8rem 0 1.2rem; line-height: 1.5; }
+    .pill-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .pill {
+      padding: 0.2rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+      background: rgba(148, 163, 184, 0.12);
+      font-size: 0.9rem;
+    }
+    .search-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 1rem;
+      backdrop-filter: blur(6px);
+      align-self: center;
+    }
+    .label { color: #94a3b8; margin: 0 0 0.4rem; font-weight: 700; }
+    .search-box input {
+      width: 100%;
+      padding: 0.9rem 1rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: #0f172a;
+      color: #e5e7eb;
+      font-size: 1rem;
+    }
+    .search-box input::placeholder { color: #64748b; }
+    .hint { color: #94a3b8; margin: 0.5rem 0 0; font-size: 0.9rem; }
+
+    .skills-grid {
+      margin-top: 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+    .skill-card {
+      padding: 1.1rem;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.02);
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .skill-head h3 { margin: 0.1rem 0; }
+    .skill-desc { margin: 0; color: #e0ebf8; line-height: 1.45; font-size: 12px; }
+    .repo { color: #94a3b8; margin: 0; font-size: 0.9rem; }
+    .tag-row { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.2rem; }
+    .tag { padding: 0.2rem 0.7rem; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; font-size: 0.9rem; background: rgba(148, 163, 184, 0.1); }
+    a { color: #e0f2fe; }
+    a:hover { color: #67e8f9; }
+
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; }
+    }
+  </style>
+
+  <script>
+    const grid = document.getElementById('skills-grid');
+
+    function filterSkills(event: Event) {
+      const input = event.target as HTMLInputElement | null;
+      const term = (input?.value || '').trim().toLowerCase();
+      if (!grid) return;
+      const cards = Array.from(grid.children) as HTMLElement[];
+      cards.forEach((card) => {
+        const title = (card.dataset.title || '').toLowerCase();
+        const tags = (card.dataset.tags || '').toLowerCase();
+        const visible = !term || title.includes(term) || tags.includes(term);
+        card.style.display = visible ? 'flex' : 'none';
+      });
+    }
+
+    // Exponer función para el oninput inline.
+    // @ts-ignore
+    window.filterSkills = filterSkills;
+  </script>
+</Layout>

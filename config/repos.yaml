@@ -1,0 +1,16 @@
+repos:
+  - id: angular-skills
+    name: Angular Skills
+    repoUrl: git@github.com:aI-dev-innovators/angular-skills.git
+    defaultBranch: main
+    readmePath: README.md
+    skillsPath: skills
+    tags: [frontend, angular]
+
+  - id: typescript-skills
+    name: TypeScript Skills
+    repoUrl: git@github.com:aI-dev-innovators/typescript-skills.git
+    defaultBranch: main
+    readmePath: README.md
+    skillsPath: skills
+    tags: [frontend, typescript]

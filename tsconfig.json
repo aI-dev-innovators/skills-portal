@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "moduleDetection": "force",
+    "jsx": "preserve",
+    "strict": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": ["astro/client", "node"],
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "baseUrl": "."
+  },
+  "include": [
+    "src",
+    "scripts",
+    "astro.config.mjs",
+    "package.json"
+  ]
+}

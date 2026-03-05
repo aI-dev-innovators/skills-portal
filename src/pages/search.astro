@@ -1,0 +1,65 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Buscar" description="Buscar skills y contenido">
+  <div class="page-title">
+    <div>
+      <h1>Búsqueda</h1>
+      <p>Index local generado durante la agregación.</p>
+    </div>
+  </div>
+  <div class="search-box">
+    <input id="search-input" type="search" placeholder="Busca por nombre, descripción o tag" />
+  </div>
+  <div id="results" style="margin-top: 1.5rem;"></div>
+</Layout>
+
+<script type="module">
+  import lunr from 'lunr';
+
+  const input = document.getElementById('search-input');
+  const results = document.getElementById('results');
+
+  let index = null;
+  let documents = [];
+
+  async function loadIndex() {
+    try {
+      const res = await fetch('/search-index.json');
+      if (!res.ok) return;
+      const data = await res.json();
+      documents = data.documents || [];
+      index = data.index ? lunr.Index.load(data.index) : null;
+    } catch (err) {
+      console.error('No se pudo cargar el índice', err);
+    }
+  }
+
+  function renderResults(items) {
+    if (!results) return;
+    if (!items.length) {
+      results.innerHTML = '<p>No hay resultados.</p>';
+      return;
+    }
+    results.innerHTML = items
+      .map((item) => {
+        const doc = documents.find((d) => d.id === item.ref);
+        if (!doc) return '';
+        return `<article class="card"><h3><a href="${doc.url}">${doc.title}</a></h3><p>${doc.description}</p><div>${(doc.tags || []).map((t) => `<span class="badge">${t}</span>`).join('')}</div></article>`;
+      })
+      .join('');
+  }
+
+  async function onSearch(event) {
+    const term = event.target.value.trim();
+    if (!term || !index) {
+      renderResults([]);
+      return;
+    }
+    const hits = index.search(term);
+    renderResults(hits);
+  }
+
+  await loadIndex();
+  if (input) input.addEventListener('input', onSearch);
+</script>

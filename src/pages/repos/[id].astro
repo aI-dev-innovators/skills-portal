@@ -1,0 +1,80 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { readReposConfig } from '../../lib/config';
+import { fetchReadme, requireToken, parseRepoSlug } from '../../lib/github';
+import { mdToHtml } from '../../lib/markdown';
+
+export async function getStaticPaths() {
+  requireToken();
+  const repos = readReposConfig();
+  return repos.map((repo) => ({ params: { id: repo.id } }));
+}
+
+const { id } = Astro.params;
+if (!id) throw new Error('Repo ID requerido');
+
+requireToken();
+const repos = readReposConfig();
+const repo = repos.find((r) => r.id === id);
+
+if (!repo) {
+  return Astro.redirect('/repos');
+}
+
+const readme = (await fetchReadme(repo)) || '# README no encontrado';
+const html = mdToHtml(readme);
+// Normaliza la URL del repo a vista web para el CTA.
+const repoWebUrl = (() => {
+  const slug = parseRepoSlug(repo.repoUrl || '');
+  if (slug) return `https://github.com/${slug.owner}/${slug.name}`;
+  return repo.repoUrl;
+})();
+---
+<Layout title={repo.name} description={repo.description || 'Repositorio registrado'}>
+  <div class="page-title">
+    <div>
+      <h1>{repo.name}</h1>
+      {repo.description && <p>{repo.description}</p>}
+      <div>
+        {(repo.tags || []).map((tag) => (
+          <span class="badge">{tag}</span>
+        ))}
+      </div>
+    </div>
+    {repoWebUrl && <a class="external" href={repoWebUrl} rel="noreferrer" target="_blank">Ver en GitHub</a>}
+  </div>
+  <div class="repo-content" set:html={html}></div>
+
+  <style>
+    .page-title {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      background: radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.12), transparent 40%),
+        radial-gradient(circle at 85% 0%, rgba(168, 85, 247, 0.12), transparent 38%),
+        var(--panel);
+      box-shadow: var(--shadow);
+      margin-bottom: 1rem;
+    }
+    .page-title h1 { margin: 0.3rem 0 0.4rem; letter-spacing: -0.01em; }
+    .page-title p { margin: 0; color: var(--muted); }
+    .page-title .badge {
+      margin: 0 0.4rem 0.3rem 0;
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text);
+    }
+    .external {
+      align-self: center;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .external:hover { color: var(--accent-strong); }
+    .repo-content { margin-top: 1.25rem; }
+  </style>
+</Layout>

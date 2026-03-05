@@ -1,0 +1,208 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { readReposConfig } from '../../lib/config';
+
+const repos = readReposConfig().sort((a, b) => a.name.localeCompare(b.name));
+const totalRepos = repos.length;
+---
+<Layout title="Repos" description="Repositorios registrados">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Catálogo de repos</p>
+      <h1>Repos con skills y documentación</h1>
+      <p class="lede">Consulta README y SKILL.md directamente desde GitHub sin clonar. Usa el buscador para filtrar rápido.</p>
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-label">Repos registrados</span>
+          <span class="stat-value">{totalRepos}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Fetch en vivo</span>
+          <span class="stat-value">GitHub API</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-card">
+      <p class="hero-label">Búsqueda</p>
+      <div class="search-box">
+        <input type="search" placeholder="Buscar por nombre, descripción o tag" oninput="filterRepos(event)" />
+      </div>
+      <p class="hint">Se filtra en cliente; los datos provienen en tiempo real.</p>
+    </div>
+  </section>
+
+  <section class="repo-section">
+    <div class="repo-header">
+      <p class="eyebrow">Listado</p>
+      <h2>Repositorios</h2>
+    </div>
+    <div class="repo-list" id="repo-list">
+      {repos.map((repo) => (
+        <article
+          class="repo-row"
+          data-search={`${repo.name} ${repo.description || ''} ${(repo.tags || []).join(' ')}`.toLowerCase()}
+        >
+          <div class="row-main">
+            <div>
+              <p class="repo-id">{repo.id}</p>
+              <h3><a href={`/repos/${repo.id}`}>{repo.name}</a></h3>
+              {repo.description && <p class="repo-desc">{repo.description}</p>}
+              <div class="tag-row">
+                {(repo.tags || []).map((tag) => (
+                  <span class="tag">{tag}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div class="row-cta">
+            <a class="ghost" href={`/repos/${repo.id}`}>Ver detalles →</a>
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <style>
+    :global(body) {
+      background: #07090f;
+      color: #e5e7eb;
+      font-family: "Space Grotesk", "Public Sans", system-ui, -apple-system, sans-serif;
+    }
+    :global(.site-header), :global(.site-footer) {
+      background: #0c101a;
+      border-color: rgba(255, 255, 255, 0.06);
+    }
+    :global(.site-header .brand) { color: #e5e7eb; }
+    :global(.site-header nav a) { color: #cbd5e1; }
+    :global(.site-header nav a:hover) { color: #e0f2fe; }
+    :global(main) { padding: 2rem 0 3rem; }
+    .hero {
+      background: radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.12), transparent 35%),
+        radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.16), transparent 32%),
+        #0c101a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    }
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.8rem;
+      color: #a5b4fc;
+      margin: 0 0 0.4rem;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      letter-spacing: -0.02em;
+    }
+    .lede {
+      color: #cbd5e1;
+      margin: 0.6rem 0 1.2rem;
+      max-width: 720px;
+      line-height: 1.5;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+    }
+    .stat {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 0.9rem 1rem;
+    }
+    .stat-label { color: #94a3b8; font-size: 0.9rem; display: block; }
+    .stat-value { font-weight: 700; font-size: 1.2rem; }
+    .hero-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 1rem;
+      backdrop-filter: blur(6px);
+      align-self: center;
+    }
+    .hero-label { color: #94a3b8; margin: 0 0 0.4rem; font-weight: 600; }
+    .search-box input {
+      width: 100%;
+      padding: 0.9rem 1rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: #0f172a;
+      color: #e5e7eb;
+      font-size: 1rem;
+    }
+    .search-box input::placeholder { color: #64748b; }
+    .hint { color: #94a3b8; margin: 0.5rem 0 0; font-size: 0.9rem; }
+
+    .repo-section { margin-top: 2rem; }
+    .repo-header h2 { margin: 0.2rem 0 0.8rem; }
+    .repo-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .repo-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+    }
+    .row-main h3 { margin: 0.1rem 0; }
+    .repo-id { color: #94a3b8; margin: 0; font-size: 0.9rem; }
+    .repo-desc { margin: 0.35rem 0 0.6rem; color: #cbd5e1; }
+    .tag-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+    .tag {
+      padding: 0.2rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+      font-size: 0.9rem;
+      background: rgba(148, 163, 184, 0.1);
+    }
+    .row-cta { align-self: center; }
+    .ghost {
+      color: #a5b4fc;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .ghost:hover { color: #c7d2fe; }
+    a { color: #e0f2fe; }
+    a:hover { color: #67e8f9; }
+
+    @media (max-width: 800px) {
+      .hero { grid-template-columns: 1fr; }
+      .row-cta { width: 100%; text-align: right; }
+      .repo-row { flex-direction: column; }
+    }
+  </style>
+
+  <script>
+    const list = document.getElementById('repo-list');
+
+    function filterRepos(event: Event) {
+      if (!list) return;
+      const input = event.target as HTMLInputElement | null;
+      const term = (input?.value || '').toLowerCase().trim();
+      const rows = Array.from(list.children) as HTMLElement[];
+      rows.forEach((row) => {
+        const haystack = (row.dataset.search || '').toLowerCase();
+        const visible = !term || haystack.includes(term);
+        row.style.display = visible ? 'flex' : 'none';
+      });
+    }
+
+    // Exponer función para el oninput inline.
+    // @ts-ignore
+    window.filterRepos = filterRepos;
+  </script>
+</Layout>

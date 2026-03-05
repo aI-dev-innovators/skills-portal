@@ -1,0 +1,187 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { fetchReadme, requireToken } from "../lib/github";
+import { mdToHtml } from "../lib/markdown";
+
+// Carga el README base para usarlo como homepage del portal.
+requireToken();
+
+// Config simple del repo fuente; reutiliza fetchReadme para evitar URLs hardcodeadas.
+const homeRepo = {
+  id: "private-skills-cli",
+  name: "Private Skills CLI",
+  repoUrl: "git@github.com:aI-dev-innovators/private-skills-cli.git",
+  defaultBranch: "main",
+  readmePath: "README.md",
+};
+
+// Renderiza README remoto a HTML para inyectarlo en server.
+const readme = (await fetchReadme(homeRepo)) || "# README no disponible";
+const homeHtml = mdToHtml(readme);
+---
+
+<Layout title="Skills Portal" description="Documentación interna de skills">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Portal interno</p>
+      <h1>Skills y repos en un solo lugar</h1>
+      <p class="lede">
+        Fetch en vivo desde GitHub (READMEs y SKILL.md) con tu token, caché en memoria y filtros rápidos.
+      </p>
+      <div class="cta-row">
+        <a class="primary" href="/skills">Ver skills</a>
+        <a class="ghost" href="/repos">Ver repos</a>
+      </div>
+    </div>
+    <div class="hero-panel">
+      <p class="panel-title">Acceso directo</p>
+      <div class="links">
+        <a class="link-card" href="/skills">
+          <span class="pill">Skills</span>
+          <h3>Catálogo en vivo</h3>
+          <p>SKILL.md desde GitHub con caché</p>
+        </a>
+        <a class="link-card" href="/repos">
+          <span class="pill">Repos</span>
+          <h3>README online</h3>
+          <p>Documentación por repo registrada</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="readme-section">
+    <div class="readme-head">
+      <div>
+        <p class="eyebrow">Inicio</p>
+        <h2>Guía principal</h2>
+        <p class="lede">Contenido proveniente del README de private-skills-cli para contextualizar el portal.</p>
+      </div>
+    </div>
+    <div class="repo-content readme-card" set:html={homeHtml}></div>
+  </section>
+
+  <style>
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 1.5rem;
+      padding: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      background:
+        radial-gradient(
+          circle at 20% 20%,
+          rgba(56, 189, 248, 0.12),
+          transparent 35%
+        ),
+        radial-gradient(
+          circle at 80% 0%,
+          rgba(168, 85, 247, 0.16),
+          transparent 32%
+        ),
+        #0c101a;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    }
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 0.8rem;
+      color: #a5b4fc;
+      margin: 0 0 0.5rem;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(1.9rem, 3vw, 2.5rem);
+      letter-spacing: -0.02em;
+    }
+    .lede {
+      color: #cbd5e1;
+      margin: 0.8rem 0 1.4rem;
+      line-height: 1.5;
+    }
+    .cta-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .primary,
+    .ghost {
+      padding: 0.9rem 1.1rem;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 700;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+    .primary {
+      background: #2563eb;
+      color: #e5e7eb;
+      border-color: #2563eb;
+    }
+    .primary:hover {
+      background: #1d4ed8;
+    }
+    .ghost {
+      color: #c7d2fe;
+    }
+    .ghost:hover {
+      color: #e0e7ff;
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .hero-panel {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 1rem;
+      backdrop-filter: blur(6px);
+    }
+    .panel-title {
+      margin: 0 0 0.75rem;
+      color: #cbd5e1;
+      font-weight: 700;
+    }
+    .links {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem;
+    }
+    .link-card {
+      display: block;
+      padding: 0.9rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.6);
+      text-decoration: none;
+      color: #e5e7eb;
+    }
+    .link-card h3 {
+      margin: 0.35rem 0 0.2rem;
+    }
+    .link-card p {
+      margin: 0;
+      color: #cbd5e1;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.18);
+      color: #cbd5e1;
+      font-size: 0.85rem;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      margin: 0;
+    }
+
+    .readme-section { margin-top: 2rem; display: flex; flex-direction: column; gap: 1rem; }
+    .readme-head h2 { margin: 0.35rem 0 0.3rem; }
+    .readme-card { margin: 0; }
+
+    @media (max-width: 900px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</Layout>

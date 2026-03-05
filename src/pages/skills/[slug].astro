@@ -1,0 +1,71 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { readReposConfig } from '../../lib/config';
+import { requireToken } from '../../lib/github';
+import { collectAllSkills, fetchSkillBySlug } from '../../lib/skills';
+import { mdToHtml } from '../../lib/markdown';
+
+export async function getStaticPaths() {
+  requireToken();
+  const repos = readReposConfig();
+  const skills = await collectAllSkills(repos);
+  return skills.map((skill) => ({ params: { slug: skill.id } }));
+}
+
+const { slug } = Astro.params;
+if (!slug) throw new Error('Slug requerido');
+
+requireToken();
+const repos = readReposConfig();
+// Busca el skill en los repos registrados y trae su markdown.
+const skill = await fetchSkillBySlug(repos, slug);
+
+if (!skill) {
+  return Astro.redirect('/skills');
+}
+
+const html = mdToHtml(skill.content);
+---
+<Layout title={skill.title} description={skill.description}>
+  <div class="page-title">
+    <div>
+      <p class="badge">{skill.repoName || skill.repoId || 'Repositorio'}</p>
+      <h1>{skill.title}</h1>
+      <p>{skill.description}</p>
+      <div>
+        {skill.tags.map((tag) => (
+          <span class="badge">{tag}</span>
+        ))}
+      </div>
+    </div>
+    {/* version opcional si se agrega en frontmatter */}
+  </div>
+  <div class="skill-content" set:html={html}></div>
+
+  <style>
+    .page-title {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      background: radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.12), transparent 40%),
+        radial-gradient(circle at 85% 0%, rgba(168, 85, 247, 0.12), transparent 38%),
+        var(--panel);
+      box-shadow: var(--shadow);
+      margin-bottom: 1rem;
+    }
+    .page-title h1 { margin: 0.3rem 0 0.4rem; letter-spacing: -0.01em; }
+    .page-title p { margin: 0; color: var(--muted); }
+    .page-title .badge {
+      margin: 0 0 0.4rem;
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text);
+    }
+    .page-title .badge + .badge { margin-left: 0.3rem; }
+    .skill-content { margin-top: 1.25rem; }
+  </style>
+</Layout>
