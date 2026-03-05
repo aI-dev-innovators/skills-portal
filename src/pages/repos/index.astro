@@ -1,9 +1,18 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { readReposConfig } from '../../lib/config';
+import { collectAllSkills } from '../../lib/skills';
 
 const repos = readReposConfig().sort((a, b) => a.name.localeCompare(b.name));
 const totalRepos = repos.length;
+const skills = await collectAllSkills(repos);
+const skillsPerRepo = skills.reduce<Record<string, number>>((acc, skill) => {
+  const key = skill.repoId || skill.repoName || '';
+  acc[key] = (acc[key] || 0) + 1;
+  return acc;
+}, {});
+const tagOptions = Array.from(new Set(repos.flatMap((r) => r.tags || []))).sort();
+const base = Astro.site?.pathname || '';
 ---
 <Layout title="Repos" description="Repositorios registrados">
   <section class="hero">
@@ -22,12 +31,25 @@ const totalRepos = repos.length;
         </div>
       </div>
     </div>
-    <div class="hero-card">
+    <div class="hero-card" id="repo-card">
       <p class="hero-label">Búsqueda</p>
       <div class="search-box">
         <input type="search" placeholder="Buscar por nombre, descripción o tag" oninput="filterRepos(event)" />
       </div>
-      <p class="hint">Se filtra en cliente; los datos provienen en tiempo real.</p>
+      <div class="filter-row">
+        <select id="repo-tag" onchange="filterRepos(event)">
+          <option value="">Tag (todos)</option>
+          {tagOptions.map((t) => (
+            <option value={t}>{t}</option>
+          ))}
+        </select>
+        <select id="repo-status" onchange="filterRepos(event)">
+          <option value="">Estado (todos)</option>
+          <option value="with">Con skills</option>
+          <option value="without">Solo README</option>
+        </select>
+      </div>
+      <p class="hint">Filtra por texto, tag y estado (con skills / solo README).</p>
     </div>
   </section>
 
@@ -37,28 +59,36 @@ const totalRepos = repos.length;
       <h2>Repositorios</h2>
     </div>
     <div class="repo-list" id="repo-list">
-      {repos.map((repo) => (
-        <article
-          class="repo-row"
-          data-search={`${repo.name} ${repo.description || ''} ${(repo.tags || []).join(' ')}`.toLowerCase()}
-        >
-          <div class="row-main">
-            <div>
-              <p class="repo-id">{repo.id}</p>
-              <h3><a href={`./${repo.id}`}>{repo.name}</a></h3>
-              {repo.description && <p class="repo-desc">{repo.description}</p>}
-              <div class="tag-row">
-                {(repo.tags || []).map((tag) => (
-                  <span class="tag">{tag}</span>
-                ))}
+      {repos.map((repo) => {
+        const tagString = (repo.tags || []).join(' ').toLowerCase();
+        const hasSkills = (skillsPerRepo[repo.id] || skillsPerRepo[repo.name] || 0) > 0;
+        const status = hasSkills ? 'with' : 'without';
+        return (
+          <article
+            class="repo-row"
+            data-search={`${repo.name} ${repo.description || ''} ${tagString}`.toLowerCase()}
+            data-tags={tagString}
+            data-status={status}
+          >
+            <div class="row-main">
+              <div>
+                <p class="repo-id">{repo.id}</p>
+                <h3><a href={`${base}/repos/${repo.id}`}>{repo.name}</a></h3>
+                {repo.description && <p class="repo-desc">{repo.description}</p>}
+                <div class="tag-row">
+                  {(repo.tags || []).map((tag) => (
+                    <span class="tag">{tag}</span>
+                  ))}
+                  <span class="tag" style="opacity:0.8">{hasSkills ? 'Con skills' : 'Solo README'}</span>
+                </div>
               </div>
             </div>
-          </div>
-          <div class="row-cta">
-            <a class="ghost" href={`./${repo.id}`}>Ver detalles →</a>
-          </div>
-        </article>
-      ))}
+            <div class="row-cta">
+              <a class="ghost" href={`${base}/repos/${repo.id}`}>Ver detalles →</a>
+            </div>
+          </article>
+        );
+      })}
     </div>
   </section>
 
@@ -139,6 +169,14 @@ const totalRepos = repos.length;
     }
     .search-box input::placeholder { color: #64748b; }
     .hint { color: #94a3b8; margin: 0.5rem 0 0; font-size: 0.9rem; }
+    .filter-row { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .filter-row select {
+      padding: 0.65rem 0.75rem;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: #0f172a;
+      color: #e5e7eb;
+    }
 
     .repo-section { margin-top: 2rem; }
     .repo-header h2 { margin: 0.2rem 0 0.8rem; }
@@ -188,15 +226,23 @@ const totalRepos = repos.length;
 
   <script>
     const list = document.getElementById('repo-list');
+    const tagSelect = document.getElementById('repo-tag');
+    const statusSelect = document.getElementById('repo-status');
 
     function filterRepos(event: Event) {
       if (!list) return;
-      const input = event.target as HTMLInputElement | null;
-      const term = (input?.value || '').toLowerCase().trim();
+      const term = (document.querySelector('#repo-card input') as HTMLInputElement | null)?.value?.toLowerCase().trim() || '';
+      const tag = (tagSelect as HTMLSelectElement | null)?.value.toLowerCase() || '';
+      const status = (statusSelect as HTMLSelectElement | null)?.value.toLowerCase() || '';
       const rows = Array.from(list.children) as HTMLElement[];
       rows.forEach((row) => {
         const haystack = (row.dataset.search || '').toLowerCase();
-        const visible = !term || haystack.includes(term);
+        const tags = (row.dataset.tags || '').toLowerCase();
+        const rowStatus = (row.dataset.status || '').toLowerCase();
+        const matchesText = !term || haystack.includes(term);
+        const matchesTag = !tag || tags.split(' ').includes(tag);
+        const matchesStatus = !status || rowStatus === status;
+        const visible = matchesText && matchesTag && matchesStatus;
         row.style.display = visible ? 'flex' : 'none';
       });
     }

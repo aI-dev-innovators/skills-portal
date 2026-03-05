@@ -7,6 +7,9 @@ import { collectAllSkills } from '../../lib/skills';
 requireToken();
 const repos = readReposConfig();
 const skills = (await collectAllSkills(repos)).sort((a, b) => a.title.localeCompare(b.title));
+const repoOptions = Array.from(new Set(skills.map((s) => s.repoName || s.repoId))).sort();
+const tagOptions = Array.from(new Set(skills.flatMap((s) => s.tags))).sort();
+const base = Astro.site?.pathname || '';
 ---
 <Layout title="Skills" description="Catálogo de skills">
   <section class="hero">
@@ -22,27 +25,57 @@ const skills = (await collectAllSkills(repos)).sort((a, b) => a.title.localeComp
     <div class="search-card">
       <p class="label">Filtrar</p>
       <div class="search-box">
-        <input type="search" placeholder="Buscar skills por título o tag" oninput="filterSkills(event)" />
+        <input id="skill-search" type="search" placeholder="Buscar skills por título o tag" oninput="filterSkills(event)" />
       </div>
-      <p class="hint">El filtrado es local; los datos vienen en tiempo real.</p>
+      <div class="filter-row">
+        <select id="skill-repo" onchange="filterSkills(event)">
+          <option value="">Repo (todos)</option>
+          {repoOptions.map((r) => (
+            <option value={r}>{r}</option>
+          ))}
+        </select>
+        <select id="skill-tag" onchange="filterSkills(event)">
+          <option value="">Tag (todos)</option>
+          {tagOptions.map((t) => (
+            <option value={t}>{t}</option>
+          ))}
+        </select>
+      </div>
+      <p class="hint">Filtra por texto, repo y tag en cliente.</p>
     </div>
   </section>
 
-  <section class="skills-grid" id="skills-grid">
-    {skills.map((skill) => (
-      <article class="skill-card" data-title={skill.title.toLowerCase()} data-tags={skill.tags.join(' ').toLowerCase()}>
-        <div class="skill-head">
-          <p class="repo">{skill.repoName || skill.repoId}</p>
-          <h3><a href={`./${skill.id}`}>{skill.title}</a></h3>
-        </div>
-        <p class="skill-desc">{skill.description}</p>
-        <div class="tag-row">
-          {skill.tags.map((tag) => (
-            <span class="tag">{tag}</span>
-          ))}
-        </div>
-      </article>
-    ))}
+  <section data-ready="true">
+    <div class="skeleton-grid" id="skills-skeleton" aria-hidden="true">
+      <div class="skeleton-block"></div>
+      <div class="skeleton-block"></div>
+      <div class="skeleton-block"></div>
+    </div>
+    {skills.length === 0 ? (
+      <p class="hint">No hay skills registrados.</p>
+    ) : (
+      <div class="skills-grid content-grid" id="skills-grid">
+        {skills.map((skill) => (
+          <article
+            class="skill-card"
+            data-title={skill.title.toLowerCase()}
+            data-tags={skill.tags.join(' ').toLowerCase()}
+            data-repo={(skill.repoName || skill.repoId || '').toLowerCase()}
+          >
+            <div class="skill-head">
+              <p class="repo">{skill.repoName || skill.repoId}</p>
+              <h3><a href={`${base}/skills/${skill.id}`}>{skill.title}</a></h3>
+            </div>
+            <p class="skill-desc">{skill.description}</p>
+            <div class="tag-row">
+              {skill.tags.map((tag) => (
+                <span class="tag">{tag}</span>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+    )}
   </section>
 
   <style>
@@ -104,6 +137,14 @@ const skills = (await collectAllSkills(repos)).sort((a, b) => a.title.localeComp
     }
     .search-box input::placeholder { color: #64748b; }
     .hint { color: #94a3b8; margin: 0.5rem 0 0; font-size: 0.9rem; }
+    .filter-row { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .filter-row select {
+      padding: 0.65rem 0.75rem;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: #0f172a;
+      color: #e5e7eb;
+    }
 
     .skills-grid {
       margin-top: 2rem;
@@ -135,16 +176,30 @@ const skills = (await collectAllSkills(repos)).sort((a, b) => a.title.localeComp
 
   <script>
     const grid = document.getElementById('skills-grid');
+    const skeleton = document.getElementById('skills-skeleton');
+    const repoSelect = document.getElementById('skill-repo');
+    const tagSelect = document.getElementById('skill-tag');
+
+    function hideSkeleton() {
+      document.querySelector('section[data-ready]')?.setAttribute('data-ready', 'true');
+      skeleton?.remove();
+    }
 
     function filterSkills(event: Event) {
       const input = event.target as HTMLInputElement | null;
       const term = (input?.value || '').trim().toLowerCase();
+      const repo = (repoSelect as HTMLSelectElement | null)?.value.toLowerCase() || '';
+      const tag = (tagSelect as HTMLSelectElement | null)?.value.toLowerCase() || '';
       if (!grid) return;
       const cards = Array.from(grid.children) as HTMLElement[];
       cards.forEach((card) => {
         const title = (card.dataset.title || '').toLowerCase();
         const tags = (card.dataset.tags || '').toLowerCase();
-        const visible = !term || title.includes(term) || tags.includes(term);
+        const repoVal = (card.dataset.repo || '').toLowerCase();
+        const matchesText = !term || title.includes(term) || tags.includes(term);
+        const matchesRepo = !repo || repoVal === repo;
+        const matchesTag = !tag || tags.split(' ').includes(tag);
+        const visible = matchesText && matchesRepo && matchesTag;
         card.style.display = visible ? 'flex' : 'none';
       });
     }
@@ -152,5 +207,9 @@ const skills = (await collectAllSkills(repos)).sort((a, b) => a.title.localeComp
     // Exponer función para el oninput inline.
     // @ts-ignore
     window.filterSkills = filterSkills;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      hideSkeleton();
+    });
   </script>
 </Layout>
