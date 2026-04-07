@@ -2,9 +2,8 @@ import { defineConfig } from 'astro/config';
 
 export default defineConfig({
   output: 'static',
-  base: '/skills-portal',
   srcDir: 'src',
-  site: 'https://aI-dev-innovators.github.io/skills-portal',
+  site: 'https://aI-dev-innovators.github.io',
   markdown: {
     syntaxHighlight: 'shiki'
   },

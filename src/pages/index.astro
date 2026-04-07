@@ -5,8 +5,6 @@ import { requireToken } from "../lib/github.service";
 import { fetchReadme } from "../lib/repo.service";
 import { mdToHtml } from "../lib/markdown";
 
-const base = Astro.site?.pathname || '';
-
 // Carga el README base para usarlo como homepage del portal.
 requireToken();
 
@@ -33,19 +31,19 @@ const homeHtml = mdToHtml(readme);
         Fetch en vivo desde GitHub (READMEs y SKILL.md) con tu token, caché en memoria y filtros rápidos.
       </p>
       <div class="cta-row">
-        <a class="primary" href={`${base}/skills`}>Ver skills</a>
-        <a class="ghost" href={`${base}/repos`}>Ver repos</a>
+        <a class="primary" href="/skills">Ver skills</a>
+        <a class="ghost" href="/repos">Ver repos</a>
       </div>
     </div>
     <div class="hero-panel">
       <p class="panel-title">Acceso directo</p>
       <div class="links">
-        <a class="link-card" href={`${base}/skills`}>
+        <a class="link-card" href="/skills">
           <span class="pill">Skills</span>
           <h3>Catálogo en vivo</h3>
           <p>SKILL.md desde GitHub con caché</p>
         </a>
-        <a class="link-card" href={`${base}/repos`}>
+        <a class="link-card" href="/repos">
           <span class="pill">Repos</span>
           <h3>README online</h3>
           <p>Documentación por repo registrada</p>

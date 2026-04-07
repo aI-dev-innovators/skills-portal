@@ -21,8 +21,7 @@ const repos = readReposConfig();
 const skill = await fetchSkillBySlug(repos, slug);
 
 if (!skill) {
-  const base = Astro.site?.pathname || '';
-  return Astro.redirect(`${base}/skills`);
+  return Astro.redirect('/skills');
 }
 
 const html = mdToHtml(skill.content);

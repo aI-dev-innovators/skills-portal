@@ -9,7 +9,6 @@ const repos = readReposConfig();
 const skills = (await collectAllSkills(repos)).sort((a, b) => a.title.localeCompare(b.title));
 const repoOptions = Array.from(new Set(skills.map((s) => s.repoName || s.repoId))).sort();
 const tagOptions = Array.from(new Set(skills.flatMap((s) => s.tags))).sort();
-const base = Astro.site?.pathname || '';
 ---
 <Layout title="Skills" description="Catálogo de skills">
   <section class="hero">
@@ -64,7 +63,7 @@ const base = Astro.site?.pathname || '';
           >
             <div class="skill-head">
               <p class="repo">{skill.repoName || skill.repoId}</p>
-              <h3><a href={`${base}/skills/${skill.id}`}>{skill.title}</a></h3>
+              <h3><a href={`/skills/${skill.id}`}>{skill.title}</a></h3>
             </div>
             <p class="skill-desc">{skill.description}</p>
             <div class="tag-row">

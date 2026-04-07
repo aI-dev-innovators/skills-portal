@@ -29,15 +29,15 @@ GITHUB_REPO_OWNER=atdetquizan
 ## Uso
 
 - `npm install` (o `npm ci` en CI; usa `--legacy-peer-deps` solo si algún peer falla).
-- `npm run dev` — servidor local en <http://localhost:4321/skills-portal> (respeta la base `skills-portal`).
-- `npm run build` — genera `dist/` estático (base `/skills-portal` para GitHub Pages).
+- `npm run dev` — servidor local en <http://localhost:4321/>.
+- `npm run build` — genera `dist/` estático con base `/`.
 - `npm run preview` — prueba el build generado.
 
 URLs útiles en local:
 
-- Home: <http://localhost:4321/skills-portal>
-- Skills: <http://localhost:4321/skills-portal/skills>
-- Repos: <http://localhost:4321/skills-portal/repos>
+- Home: <http://localhost:4321/>
+- Skills: <http://localhost:4321/skills>
+- Repos: <http://localhost:4321/repos>
 
 ## Comportamiento de datos
 
@@ -60,7 +60,7 @@ URLs útiles en local:
 
 ## Notas de despliegue
 
-- Base de la app: `/skills-portal` (configurada en `astro.config.mjs`) para GitHub Pages.
+- Base de la app: `/` (configurada en `astro.config.mjs`).
 - Workflows: `.github/workflows/build.yml` valida build y `.github/workflows/deploy.yml` publica en Pages (usa `npm ci`, cache npm y requiere `GITHUB_TOKEN`).
 
 ## Depuración

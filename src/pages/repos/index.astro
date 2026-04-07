@@ -12,7 +12,6 @@ const skillsPerRepo = skills.reduce<Record<string, number>>((acc, skill) => {
   return acc;
 }, {});
 const tagOptions = Array.from(new Set(repos.flatMap((r) => r.tags || []))).sort();
-const base = Astro.site?.pathname || '';
 ---
 <Layout title="Repos" description="Repositorios registrados">
   <section class="hero">
@@ -73,7 +72,7 @@ const base = Astro.site?.pathname || '';
             <div class="row-main">
               <div>
                 <p class="repo-id">{repo.id}</p>
-                <h3><a href={`${base}/repos/${repo.id}`}>{repo.name}</a></h3>
+                <h3><a href={`/repos/${repo.id}`}>{repo.name}</a></h3>
                 {repo.description && <p class="repo-desc">{repo.description}</p>}
                 <div class="tag-row">
                   {(repo.tags || []).map((tag) => (
@@ -84,7 +83,7 @@ const base = Astro.site?.pathname || '';
               </div>
             </div>
             <div class="row-cta">
-              <a class="ghost" href={`${base}/repos/${repo.id}`}>Ver detalles →</a>
+              <a class="ghost" href={`/repos/${repo.id}`}>Ver detalles →</a>
             </div>
           </article>
         );

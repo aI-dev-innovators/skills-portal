@@ -7,15 +7,14 @@ export async function getStaticPaths() {
 }
 
 const { slug } = Astro.params;
-const base = Astro.site?.pathname || '';
 
 // Rutas conocidas que ya tienen página propia; se dejan tal cual.
 const reserved = new Set(['', 'skills', 'repos', 'search']);
 
 if (!slug || reserved.has(slug)) {
-  return Astro.redirect(`${base}/`);
+  return Astro.redirect('/');
 }
 
 // Redirige slugs huérfanos a la página de repos correspondiente.
-return Astro.redirect(`${base}/repos/${slug}`);
+return Astro.redirect(`/repos/${slug}`);
 ---

@@ -2,7 +2,6 @@
 import '../styles/global.css';
 
 const { title = 'Skills Portal', description = 'Portal interno de skills' } = Astro.props;
-const base = Astro.site?.pathname || '';
 ---
 
 <!DOCTYPE html>
@@ -18,9 +17,9 @@ const base = Astro.site?.pathname || '';
       <div class="shell">
         <div class="brand">Skills Portal</div>
         <nav>
-          <a href={`${base}/`}>Inicio</a>
-          <a href={`${base}/skills`}>Skills</a>
-          <a href={`${base}/repos`}>Repos</a>
+          <a href="/">Inicio</a>
+          <a href="/skills">Skills</a>
+          <a href="/repos">Repos</a>
         </nav>
       </div>
     </header>

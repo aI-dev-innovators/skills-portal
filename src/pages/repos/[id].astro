@@ -19,8 +19,7 @@ const repos = readReposConfig();
 const repo = repos.find((r) => r.id === id);
 
 if (!repo) {
-  const base = Astro.site?.pathname || '';
-  return Astro.redirect(`${base}/repos`);
+  return Astro.redirect('/repos');
 }
 
 const readme = (await fetchReadme(repo)) || '# README no encontrado';
