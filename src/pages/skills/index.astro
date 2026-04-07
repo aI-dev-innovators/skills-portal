@@ -1,8 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { readReposConfig } from '../../lib/config';
-import { requireToken } from '../../lib/github';
-import { collectAllSkills } from '../../lib/skills';
+import { requireToken } from '../../lib/github.service';
+import { collectAllSkills } from '../../lib/skill.service';
 
 requireToken();
 const repos = readReposConfig();

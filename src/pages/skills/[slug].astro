@@ -1,8 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { readReposConfig } from '../../lib/config';
-import { requireToken } from '../../lib/github';
-import { collectAllSkills, fetchSkillBySlug } from '../../lib/skills';
+import { requireToken } from '../../lib/github.service';
+import { collectAllSkills, fetchSkillBySlug } from '../../lib/skill.service';
 import { mdToHtml } from '../../lib/markdown';
 
 export async function getStaticPaths() {

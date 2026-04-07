@@ -1,12 +1,22 @@
 [
   {
-    "id": "frontend-skills",
-    "name": "Frontend Skills",
+    "id": "angular-skills",
+    "name": "Angular Skills",
     "description": "",
     "tags": [
       "frontend",
       "angular"
     ],
-    "url": "/repos/frontend-skills"
+    "url": "/repos/angular-skills"
+  },
+  {
+    "id": "typescript-skills",
+    "name": "TypeScript Skills",
+    "description": "",
+    "tags": [
+      "frontend",
+      "typescript"
+    ],
+    "url": "/repos/typescript-skills"
   }
 ]

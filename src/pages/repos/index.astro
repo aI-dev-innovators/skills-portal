@@ -1,7 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { readReposConfig } from '../../lib/config';
-import { collectAllSkills } from '../../lib/skills';
+import { collectAllSkills } from '../../lib/skill.service';
 
 const repos = readReposConfig().sort((a, b) => a.name.localeCompare(b.name));
 const totalRepos = repos.length;

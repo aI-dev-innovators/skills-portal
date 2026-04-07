@@ -14,6 +14,8 @@ export interface RepoConfig {
   name: string;
   /** Descripción opcional mostrada en catálogo. */
   description?: string;
+  /** Owner opcional para sobreescribir el owner parseado desde repoUrl. */
+  owner?: string;
   /** URL SSH o HTTPS al repositorio de origen. */
   repoUrl: string;
   /** Rama por defecto; si falta se usa main. */
@@ -34,7 +36,10 @@ const CONFIG_PATH = path.join(ROOT, 'config/repos.yaml');
 /**
  * Lee config/repos.yaml y devuelve la lista de repos registrados.
  * Retorna [] si el archivo no existe o no contiene el nodo repos.
+ *
  * @returns {RepoConfig[]} Lista de configuraciones de repos.
+ * @example
+ * const repos = readReposConfig();
  */
 export function readReposConfig(): RepoConfig[] {
   if (!fs.existsSync(CONFIG_PATH)) return [];

@@ -1,6 +1,8 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import { fetchReadme, requireToken } from "../lib/github";
+import type { RepoConfig } from "../lib/config";
+import { requireToken } from "../lib/github.service";
+import { fetchReadme } from "../lib/repo.service";
 import { mdToHtml } from "../lib/markdown";
 
 const base = Astro.site?.pathname || '';
@@ -9,7 +11,7 @@ const base = Astro.site?.pathname || '';
 requireToken();
 
 // Config simple del repo fuente; reutiliza fetchReadme para evitar URLs hardcodeadas.
-const homeRepo = {
+const homeRepo: RepoConfig = {
   id: "private-skills-cli",
   name: "Private Skills CLI",
   repoUrl: "git@github.com:aI-dev-innovators/private-skills-cli.git",

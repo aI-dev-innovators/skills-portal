@@ -1,7 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { readReposConfig } from '../../lib/config';
-import { fetchReadme, requireToken, parseRepoSlug } from '../../lib/github';
+import { requireToken } from '../../lib/github.service';
+import { fetchReadme, parseRepoSlug } from '../../lib/repo.service';
 import { mdToHtml } from '../../lib/markdown';
 
 export async function getStaticPaths() {
