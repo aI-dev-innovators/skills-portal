@@ -4,6 +4,8 @@ import {
   fetchJson,
   fetchRepositoryFileText,
   getDefaultRepoOwner,
+  GitHubCommitResponse,
+  GitHubContributorResponse,
   GitHubRepoResponse
 } from './github.service';
 
@@ -33,6 +35,20 @@ export interface RepoContext {
 
 /** Cache de metadata por id de repositorio para evitar llamadas repetidas. */
 const repoContextCache = new Map<string, RepoContext>();
+const repoMetricsCache = new Map<string, { expiresAt: number; metrics: RepoMetrics }>();
+const REPO_METRICS_TTL_MS = 5 * 60 * 1000;
+
+/** Metricas publicas del repositorio para uso en UI. */
+export interface RepoMetrics {
+  /** Estrellas del repositorio. */
+  stars: number;
+  /** Forks del repositorio. */
+  forks: number;
+  /** Cantidad de contributors identificados. */
+  contributors: number;
+  /** Fecha ISO del ultimo commit detectado. */
+  lastCommitDate: string | null;
+}
 
 /**
  * Extrae owner/repo desde una URL SSH o HTTPS de GitHub.
@@ -140,4 +156,58 @@ export async function fetchReadme(repo: RepoConfig, context?: RepoContext): Prom
   console.error(`[repo:${repo.id}] README no disponible en Contents API para rama ${branch}.`);
 
   return null;
+}
+
+/**
+ * Obtiene métricas del repositorio con caché temporal para minimizar llamadas a GitHub.
+ *
+ * @param {RepoConfig} repo Configuración declarativa del repositorio.
+ * @param {RepoContext} [context] Contexto precalculado para evitar lecturas duplicadas.
+ * @returns {Promise<RepoMetrics>} Métricas listas para mostrar en UI.
+ * @example
+ * const metrics = await fetchRepoMetrics(repoConfig);
+ */
+export async function fetchRepoMetrics(repo: RepoConfig, context?: RepoContext): Promise<RepoMetrics> {
+  const cacheHit = repoMetricsCache.get(repo.id);
+  if (cacheHit && cacheHit.expiresAt > Date.now()) {
+    return cacheHit.metrics;
+  }
+
+  const resolvedContext = context || (await getRepoContext(repo));
+  if (!resolvedContext) {
+    return {
+      stars: 0,
+      forks: 0,
+      contributors: 0,
+      lastCommitDate: null
+    };
+  }
+
+  const owner = resolvedContext.slug.owner;
+  const name = resolvedContext.slug.name;
+  const branch = resolvedContext.defaultBranch;
+
+  const repoUrl = buildRepoApiUrl(owner, name, '');
+  const contributorsUrl = `${buildRepoApiUrl(owner, name, '/contributors')}?per_page=100&anon=1`;
+  const commitsUrl = `${buildRepoApiUrl(owner, name, '/commits')}?sha=${encodeURIComponent(branch)}&per_page=1`;
+
+  const [repoMetadata, contributors, commits] = await Promise.all([
+    fetchJson<GitHubRepoResponse>(repoUrl),
+    fetchJson<GitHubContributorResponse[]>(contributorsUrl),
+    fetchJson<GitHubCommitResponse[]>(commitsUrl)
+  ]);
+
+  const metrics: RepoMetrics = {
+    stars: repoMetadata?.stargazers_count ?? 0,
+    forks: repoMetadata?.forks_count ?? 0,
+    contributors: contributors?.length ?? 0,
+    lastCommitDate: commits?.[0]?.commit?.author?.date || repoMetadata?.pushed_at || null
+  };
+
+  repoMetricsCache.set(repo.id, {
+    metrics,
+    expiresAt: Date.now() + REPO_METRICS_TTL_MS
+  });
+
+  return metrics;
 }

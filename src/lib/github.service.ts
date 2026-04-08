@@ -89,6 +89,32 @@ export interface GitHubRepoResponse {
   private: boolean;
   /** Rama por defecto configurada en el repositorio. */
   default_branch: string;
+  /** Numero de estrellas del repositorio. */
+  stargazers_count: number;
+  /** Numero de forks del repositorio. */
+  forks_count: number;
+  /** Fecha del ultimo push al repositorio. */
+  pushed_at?: string;
+}
+
+/** Entrada minima de contributor retornada por GitHub API. */
+export interface GitHubContributorResponse {
+  /** Login del contributor. */
+  login?: string;
+  /** Numero de contribuciones registradas por GitHub. */
+  contributions?: number;
+}
+
+/** Entrada minima de commit retornada por GitHub API. */
+export interface GitHubCommitResponse {
+  /** Payload del commit con metadatos de autoria. */
+  commit?: {
+    /** Autor del commit segun metadata interna de Git. */
+    author?: {
+      /** Fecha ISO del commit. */
+      date?: string;
+    };
+  };
 }
 
 /** Entrada de archivo/directorio retornada por Contents API. */

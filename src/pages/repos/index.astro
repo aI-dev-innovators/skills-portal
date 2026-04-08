@@ -2,6 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import { readReposConfig } from '../../lib/config';
 import { collectAllSkills } from '../../lib/skill.service';
+import { fetchRepoMetrics } from '../../lib/repo.service';
 
 const repos = readReposConfig().sort((a, b) => a.name.localeCompare(b.name));
 const totalRepos = repos.length;
@@ -12,6 +13,23 @@ const skillsPerRepo = skills.reduce<Record<string, number>>((acc, skill) => {
   return acc;
 }, {});
 const tagOptions = Array.from(new Set(repos.flatMap((r) => r.tags || []))).sort();
+const repoRows = await Promise.all(
+  repos.map(async (repo) => {
+    const metrics = await fetchRepoMetrics(repo);
+    return { repo, metrics };
+  })
+);
+
+function formatShortDate(value: string | null): string {
+  if (!value) return 'Sin datos';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Sin datos';
+  return parsed.toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit'
+  });
+}
 ---
 <Layout title="Repos" description="Repositorios registrados">
   <section class="hero">
@@ -58,7 +76,7 @@ const tagOptions = Array.from(new Set(repos.flatMap((r) => r.tags || []))).sort(
       <h2>Repositorios</h2>
     </div>
     <div class="repo-list" id="repo-list">
-      {repos.map((repo) => {
+      {repoRows.map(({ repo, metrics }) => {
         const tagString = (repo.tags || []).join(' ').toLowerCase();
         const hasSkills = (skillsPerRepo[repo.id] || skillsPerRepo[repo.name] || 0) > 0;
         const status = hasSkills ? 'with' : 'without';
@@ -79,6 +97,12 @@ const tagOptions = Array.from(new Set(repos.flatMap((r) => r.tags || []))).sort(
                     <span class="tag">{tag}</span>
                   ))}
                   <span class="tag" style="opacity:0.8">{hasSkills ? 'Con skills' : 'Solo README'}</span>
+                </div>
+                <div class="metrics-row">
+                  <span class="metric">★ {metrics.stars}</span>
+                  <span class="metric">⑂ {metrics.forks}</span>
+                  <span class="metric">👥 {metrics.contributors}</span>
+                  <span class="metric">Último commit: {formatShortDate(metrics.lastCommitDate)}</span>
                 </div>
               </div>
             </div>
@@ -205,6 +229,20 @@ const tagOptions = Array.from(new Set(repos.flatMap((r) => r.tags || []))).sort(
       color: #cbd5e1;
       font-size: 0.9rem;
       background: rgba(148, 163, 184, 0.1);
+    }
+    .metrics-row {
+      margin-top: 0.7rem;
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .metric {
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      background: rgba(56, 189, 248, 0.1);
+      color: #bae6fd;
+      font-size: 0.82rem;
     }
     .row-cta { align-self: center; }
     .ghost {
