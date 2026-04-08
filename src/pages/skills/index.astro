@@ -7,69 +7,162 @@ import { collectAllSkills } from '../../lib/skill.service';
 requireToken();
 const repos = readReposConfig();
 const skills = (await collectAllSkills(repos)).sort((a, b) => a.title.localeCompare(b.title));
+
 const repoOptions = Array.from(new Set(skills.map((s) => s.repoName || s.repoId))).sort();
-const tagOptions = Array.from(new Set(skills.flatMap((s) => s.tags))).sort();
+const frameworkOptions = Array.from(new Set(skills.flatMap((s) => s.frameworks || []))).sort();
+const levelOptions = Array.from(new Set(skills.map((s) => s.level))).sort();
+const testTypeOptions = Array.from(new Set(skills.flatMap((s) => s.testTypes || []))).sort();
+const statusOptions = Array.from(new Set(skills.map((s) => s.status))).sort();
+
+const totalSkills = skills.length;
+const skillsWithExamples = skills.filter((skill) => skill.hasExamples).length;
+const skillsRecommended = skills.filter((skill) => skill.status === 'recommended').length;
+const avgEstimatedTime =
+  skills.reduce((acc, skill) => acc + (typeof skill.estimatedTime === 'number' ? skill.estimatedTime : 0), 0) /
+  Math.max(skills.filter((skill) => typeof skill.estimatedTime === 'number').length, 1);
 ---
-<Layout title="Skills" description="Catálogo de skills">
+<Layout title="Skills" description="Catálogo de skills con metadata enriquecida">
   <section class="hero">
-    <div>
-      <p class="eyebrow">Catálogo</p>
-      <h1>Skills en vivo desde GitHub</h1>
-      <p class="lede">Explora SKILL.md de todos los repos registrados. Filtra por título o tags y abre el detalle renderizado en server.</p>
-      <div class="pill-row">
-        <span class="pill">Cache 5m</span>
-        <span class="pill">Fetch autenticado</span>
+    <div class="hero-copy">
+      <p class="eyebrow">Skills Catalog</p>
+      <h1>Explora skills por framework, nivel y tipo de prueba</h1>
+      <p class="lede">
+        Descubre skills listas para ejecutar con filtros facetados, badges de activos disponibles y señales editoriales de madurez.
+      </p>
+      <div class="kpi-strip">
+        <article class="kpi-card">
+          <span>Total skills</span>
+          <strong>{totalSkills}</strong>
+        </article>
+        <article class="kpi-card">
+          <span>Con ejemplos</span>
+          <strong>{skillsWithExamples}</strong>
+        </article>
+        <article class="kpi-card">
+          <span>Recommended</span>
+          <strong>{skillsRecommended}</strong>
+        </article>
+        <article class="kpi-card">
+          <span>Tiempo promedio</span>
+          <strong>{Math.round(avgEstimatedTime || 0)} min</strong>
+        </article>
       </div>
     </div>
-    <div class="search-card">
-      <p class="label">Filtrar</p>
-      <div class="search-box">
-        <input id="skill-search" type="search" placeholder="Buscar skills por título o tag" oninput="filterSkills(event)" />
-      </div>
-      <div class="filter-row">
-        <select id="skill-repo" onchange="filterSkills(event)">
-          <option value="">Repo (todos)</option>
-          {repoOptions.map((r) => (
-            <option value={r}>{r}</option>
+
+    <aside class="facet-panel" aria-label="Filtros de skills">
+      <p class="panel-title">Filtrar skills</p>
+      <label>
+        Buscar
+        <input id="skill-search" type="search" placeholder="Ej. angular, jest, coverage" oninput="filterSkills()" />
+      </label>
+      <label>
+        Repositorio
+        <select id="skill-repo" onchange="filterSkills()">
+          <option value="">Todos</option>
+          {repoOptions.map((repo) => (
+            <option value={repo.toLowerCase()}>{repo}</option>
           ))}
         </select>
-        <select id="skill-tag" onchange="filterSkills(event)">
-          <option value="">Tag (todos)</option>
-          {tagOptions.map((t) => (
-            <option value={t}>{t}</option>
+      </label>
+      <label>
+        Framework
+        <select id="skill-framework" onchange="filterSkills()">
+          <option value="">Todos</option>
+          {frameworkOptions.map((framework) => (
+            <option value={framework}>{framework}</option>
           ))}
         </select>
-      </div>
-      <p class="hint">Filtra por texto, repo y tag en cliente.</p>
-    </div>
+      </label>
+      <label>
+        Nivel
+        <select id="skill-level" onchange="filterSkills()">
+          <option value="">Todos</option>
+          {levelOptions.map((level) => (
+            <option value={level}>{level}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Tipo de test
+        <select id="skill-test-type" onchange="filterSkills()">
+          <option value="">Todos</option>
+          {testTypeOptions.map((testType) => (
+            <option value={testType}>{testType}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Estado
+        <select id="skill-status" onchange="filterSkills()">
+          <option value="">Todos</option>
+          {statusOptions.map((status) => (
+            <option value={status}>{status}</option>
+          ))}
+        </select>
+      </label>
+      <label class="inline-check">
+        <input id="skill-examples-only" type="checkbox" onchange="filterSkills()" />
+        Solo con examples
+      </label>
+      <label class="inline-check">
+        <input id="skill-recommended-only" type="checkbox" onchange="filterSkills()" />
+        Solo recommended
+      </label>
+      <p class="hint">El filtrado se ejecuta en cliente para respuesta inmediata.</p>
+    </aside>
   </section>
 
-  <section data-ready="true">
-    <div class="skeleton-grid" id="skills-skeleton" aria-hidden="true">
-      <div class="skeleton-block"></div>
-      <div class="skeleton-block"></div>
-      <div class="skeleton-block"></div>
-    </div>
+  <section class="results-head">
+    <h2>Resultados</h2>
+    <p id="results-count">{totalSkills} skills visibles</p>
+  </section>
+
+  <section>
     {skills.length === 0 ? (
-      <p class="hint">No hay skills registrados.</p>
+      <p class="hint">No hay skills registradas.</p>
     ) : (
-      <div class="skills-grid content-grid" id="skills-grid">
+      <div class="skills-grid" id="skills-grid">
         {skills.map((skill) => (
           <article
             class="skill-card"
             data-title={skill.title.toLowerCase()}
-            data-tags={skill.tags.join(' ').toLowerCase()}
+            data-desc={skill.description.toLowerCase()}
+            data-tags={(skill.tags || []).join(' ').toLowerCase()}
+            data-frameworks={(skill.frameworks || []).join(' ').toLowerCase()}
+            data-level={(skill.level || '').toLowerCase()}
+            data-test-types={(skill.testTypes || []).join(' ').toLowerCase()}
+            data-status={(skill.status || '').toLowerCase()}
             data-repo={(skill.repoName || skill.repoId || '').toLowerCase()}
+            data-has-examples={skill.hasExamples ? 'true' : 'false'}
           >
-            <div class="skill-head">
+            <header>
               <p class="repo">{skill.repoName || skill.repoId}</p>
               <h3><a href={`/skills/${skill.id}`}>{skill.title}</a></h3>
+              <p class="desc">{skill.description}</p>
+            </header>
+
+            <div class="meta-row">
+              <span class="meta-chip">{skill.level}</span>
+              <span class="meta-chip">{skill.status}</span>
+              {typeof skill.estimatedTime === 'number' && <span class="meta-chip">{skill.estimatedTime} min</span>}
+              <span class="meta-chip">v{skill.version}</span>
             </div>
-            <p class="skill-desc">{skill.description}</p>
-            <div class="tag-row">
-              {skill.tags.map((tag) => (
-                <span class="tag">{tag}</span>
+
+            <div class="taxonomy-row">
+              {(skill.frameworks || []).map((framework) => (
+                <span class="tag framework">{framework}</span>
               ))}
+              {(skill.testTypes || []).map((testType) => (
+                <span class="tag type">{testType}</span>
+              ))}
+            </div>
+
+            <div class="asset-row">
+              {skill.hasExamples && <span class="badge">Examples</span>}
+              {skill.hasTemplates && <span class="badge">Templates</span>}
+              {skill.hasEvals && <span class="badge">Evals</span>}
+              {skill.hasScripts && <span class="badge">Scripts</span>}
+              {skill.status === 'recommended' && <span class="badge featured">Recommended</span>}
             </div>
           </article>
         ))}
@@ -79,136 +172,350 @@ const tagOptions = Array.from(new Set(skills.flatMap((s) => s.tags))).sort();
 
   <style>
     :global(body) {
-      background: #07090f;
-      color: #e5e7eb;
-      font-family: "Space Grotesk", "Public Sans", system-ui, -apple-system, sans-serif;
+      background: #f4f6f8;
+      color: #101522;
+      font-family: "Sora", "Space Grotesk", "Public Sans", system-ui, -apple-system, sans-serif;
     }
-    :global(.site-header), :global(.site-footer) {
-      background: #0c101a;
-      border-color: rgba(255, 255, 255, 0.06);
-    }
-    :global(.site-header .brand) { color: #e5e7eb; }
-    :global(.site-header nav a) { color: #cbd5e1; }
-    :global(.site-header nav a:hover) { color: #e0f2fe; }
-    :global(main) { padding: 2rem 0 3rem; }
 
     .hero {
       display: grid;
-      grid-template-columns: 1.3fr 1fr;
-      gap: 1.5rem;
-      padding: 2rem;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      grid-template-columns: 1.5fr 1fr;
+      gap: 1.2rem;
+      align-items: start;
+      padding: 1.25rem;
       border-radius: 18px;
-      background: radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.16), transparent 32%),
-        radial-gradient(circle at 90% 0%, rgba(168, 85, 247, 0.2), transparent 35%),
-        #0c101a;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      background:
+        radial-gradient(circle at 12% 10%, rgba(0, 131, 143, 0.15), transparent 38%),
+        radial-gradient(circle at 95% 0%, rgba(218, 90, 48, 0.14), transparent 32%),
+        #ffffff;
+      border: 1px solid #dce1e7;
+      box-shadow: 0 12px 40px rgba(16, 21, 34, 0.08);
     }
-    .eyebrow { text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.8rem; color: #a5b4fc; margin: 0 0 0.5rem; }
-    h1 { margin: 0; font-size: clamp(1.9rem, 3vw, 2.5rem); letter-spacing: -0.02em; }
-    .lede { color: #cbd5e1; margin: 0.8rem 0 1.2rem; line-height: 1.5; }
-    .pill-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-    .pill {
-      padding: 0.2rem 0.7rem;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: #cbd5e1;
-      background: rgba(148, 163, 184, 0.12);
+
+    .eyebrow {
+      margin: 0;
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #007987;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0.5rem 0;
+      font-size: clamp(1.6rem, 3.2vw, 2.25rem);
+      line-height: 1.12;
+    }
+
+    .lede {
+      margin: 0;
+      color: #455065;
+      max-width: 62ch;
+    }
+
+    .kpi-strip {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.65rem;
+    }
+
+    .kpi-card {
+      display: grid;
+      gap: 0.2rem;
+      padding: 0.65rem 0.75rem;
+      border-radius: 12px;
+      background: #f9fbfc;
+      border: 1px solid #d7dee6;
+    }
+
+    .kpi-card span {
+      font-size: 0.74rem;
+      color: #5d6a80;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .kpi-card strong {
+      font-size: 1rem;
+      color: #0f172a;
+    }
+
+    .facet-panel {
+      padding: 0.95rem;
+      border-radius: 14px;
+      background: #fbfdff;
+      border: 1px solid #d7dee6;
+      display: grid;
+      gap: 0.55rem;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-weight: 700;
+      color: #122036;
+    }
+
+    label {
+      display: grid;
+      gap: 0.28rem;
+      font-size: 0.82rem;
+      color: #39465c;
+    }
+
+    input[type="search"],
+    select {
+      width: 100%;
+      padding: 0.56rem 0.65rem;
+      border-radius: 10px;
+      border: 1px solid #cad3dd;
+      background: #ffffff;
+      color: #101522;
       font-size: 0.9rem;
     }
-    .search-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
-      padding: 1rem;
-      backdrop-filter: blur(6px);
-      align-self: center;
+
+    .inline-check {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      margin-top: 0.2rem;
     }
-    .label { color: #94a3b8; margin: 0 0 0.4rem; font-weight: 700; }
-    .search-box input {
-      width: 100%;
-      padding: 0.9rem 1rem;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: #0f172a;
-      color: #e5e7eb;
-      font-size: 1rem;
+
+    .hint {
+      margin: 0;
+      color: #637088;
+      font-size: 0.82rem;
     }
-    .search-box input::placeholder { color: #64748b; }
-    .hint { color: #94a3b8; margin: 0.5rem 0 0; font-size: 0.9rem; }
-    .filter-row { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
-    .filter-row select {
-      padding: 0.65rem 0.75rem;
-      border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: #0f172a;
-      color: #e5e7eb;
+
+    .results-head {
+      margin-top: 1.4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .results-head h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      letter-spacing: 0.02em;
+    }
+
+    .results-head p {
+      margin: 0;
+      color: #5d6a80;
+      font-size: 0.9rem;
     }
 
     .skills-grid {
-      margin-top: 2rem;
+      margin-top: 0.85rem;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0.75rem;
     }
-    .skill-card {
-      padding: 1.1rem;
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.02);
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
-    .skill-head h3 { margin: 0.1rem 0; }
-    .skill-desc { margin: 0; color: #e0ebf8; line-height: 1.45; font-size: 12px; }
-    .repo { color: #94a3b8; margin: 0; font-size: 0.9rem; }
-    .tag-row { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.2rem; }
-    .tag { padding: 0.2rem 0.7rem; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.12); color: #cbd5e1; font-size: 0.9rem; background: rgba(148, 163, 184, 0.1); }
-    a { color: #e0f2fe; }
-    a:hover { color: #67e8f9; }
 
-    @media (max-width: 900px) {
-      .hero { grid-template-columns: 1fr; }
+    .skill-card {
+      display: grid;
+      gap: 0.6rem;
+      padding: 0.95rem;
+      border-radius: 14px;
+      background: #ffffff;
+      border: 1px solid #dce1e7;
+      box-shadow: 0 6px 22px rgba(16, 21, 34, 0.05);
+      transition: transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    .skill-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 26px rgba(16, 21, 34, 0.1);
+    }
+
+    .repo {
+      margin: 0;
+      color: #007987;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+
+    h3 {
+      margin: 0.2rem 0;
+      font-size: 1.05rem;
+      line-height: 1.2;
+    }
+
+    .desc {
+      margin: 0;
+      color: #37445b;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .meta-row,
+    .taxonomy-row,
+    .asset-row {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+
+    .meta-chip {
+      padding: 0.14rem 0.5rem;
+      border-radius: 999px;
+      background: #eef3f7;
+      color: #1f2a3d;
+      border: 1px solid #d4dde6;
+      font-size: 0.74rem;
+      text-transform: lowercase;
+    }
+
+    .tag {
+      padding: 0.14rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      border: 1px solid transparent;
+    }
+
+    .tag.framework {
+      background: #e6f8f9;
+      color: #006d77;
+      border-color: #b9e4e8;
+    }
+
+    .tag.type {
+      background: #fff2e8;
+      color: #b34e1f;
+      border-color: #f5d7c6;
+    }
+
+    .badge {
+      padding: 0.12rem 0.46rem;
+      border-radius: 999px;
+      border: 1px solid #d6dee7;
+      background: #f8fafc;
+      color: #24324a;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    .badge.featured {
+      background: #0f766e;
+      border-color: #0f766e;
+      color: #ffffff;
+    }
+
+    a {
+      color: #0d3b66;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 1024px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .kpi-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .kpi-strip {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 
   <script>
     const grid = document.getElementById('skills-grid');
-    const skeleton = document.getElementById('skills-skeleton');
-    const repoSelect = document.getElementById('skill-repo');
-    const tagSelect = document.getElementById('skill-tag');
+    const resultsCount = document.getElementById('results-count');
 
-    function hideSkeleton() {
-      document.querySelector('section[data-ready]')?.setAttribute('data-ready', 'true');
-      skeleton?.remove();
+    function tokenize(value: string): string {
+      return (value || '').toLowerCase().trim();
     }
 
-    function filterSkills(event: Event) {
-      const input = event.target as HTMLInputElement | null;
-      const term = (input?.value || '').trim().toLowerCase();
-      const repo = (repoSelect as HTMLSelectElement | null)?.value.toLowerCase() || '';
-      const tag = (tagSelect as HTMLSelectElement | null)?.value.toLowerCase() || '';
+    function getValue(id: string): string {
+      const node = document.getElementById(id);
+      if (!node) return '';
+      if (node instanceof HTMLInputElement && node.type === 'checkbox') {
+        return node.checked ? 'true' : '';
+      }
+      if (node instanceof HTMLInputElement || node instanceof HTMLSelectElement) {
+        return tokenize(node.value || '');
+      }
+      return '';
+    }
+
+    function matchesFacet(
+      card: HTMLElement,
+      query: string,
+      repo: string,
+      framework: string,
+      level: string,
+      testType: string,
+      status: string,
+      examplesOnly: boolean,
+      recommendedOnly: boolean
+    ): boolean {
+      const title = tokenize(card.dataset.title || '');
+      const desc = tokenize(card.dataset.desc || '');
+      const tags = tokenize(card.dataset.tags || '');
+      const repoValue = tokenize(card.dataset.repo || '');
+      const frameworks = tokenize(card.dataset.frameworks || '');
+      const cardLevel = tokenize(card.dataset.level || '');
+      const testTypes = tokenize(card.dataset.testTypes || '');
+      const cardStatus = tokenize(card.dataset.status || '');
+      const hasExamples = String(card.dataset.hasExamples || '').toLowerCase() === 'true';
+
+      const searchTarget = `${title} ${desc} ${tags} ${frameworks} ${testTypes}`;
+
+      const queryOk = !query || searchTarget.includes(query);
+      const repoOk = !repo || repoValue === repo;
+      const frameworkOk = !framework || frameworks.split(' ').includes(framework);
+      const levelOk = !level || cardLevel === level;
+      const testTypeOk = !testType || testTypes.split(' ').includes(testType);
+      const statusOk = !status || cardStatus === status;
+      const examplesOk = !examplesOnly || hasExamples;
+      const recommendedOk = !recommendedOnly || cardStatus === 'recommended';
+
+      return queryOk && repoOk && frameworkOk && levelOk && testTypeOk && statusOk && examplesOk && recommendedOk;
+    }
+
+    function filterSkills() {
       if (!grid) return;
+
+      const query = getValue('skill-search');
+      const repo = getValue('skill-repo');
+      const framework = getValue('skill-framework');
+      const level = getValue('skill-level');
+      const testType = getValue('skill-test-type');
+      const status = getValue('skill-status');
+      const examplesOnly = getValue('skill-examples-only') === 'true';
+      const recommendedOnly = getValue('skill-recommended-only') === 'true';
+
       const cards = Array.from(grid.children) as HTMLElement[];
+      let visibleCount = 0;
+
       cards.forEach((card) => {
-        const title = (card.dataset.title || '').toLowerCase();
-        const tags = (card.dataset.tags || '').toLowerCase();
-        const repoVal = (card.dataset.repo || '').toLowerCase();
-        const matchesText = !term || title.includes(term) || tags.includes(term);
-        const matchesRepo = !repo || repoVal === repo;
-        const matchesTag = !tag || tags.split(' ').includes(tag);
-        const visible = matchesText && matchesRepo && matchesTag;
-        card.style.display = visible ? 'flex' : 'none';
+        const asElement = card;
+        const visible = matchesFacet(asElement, query, repo, framework, level, testType, status, examplesOnly, recommendedOnly);
+        if (asElement instanceof HTMLElement) {
+          asElement.style.display = visible ? 'grid' : 'none';
+        }
+        if (visible) visibleCount += 1;
       });
+
+      if (resultsCount) {
+        resultsCount.textContent = `${visibleCount} skills visibles`;
+      }
     }
 
-    // Exponer función para el oninput inline.
     // @ts-ignore
     window.filterSkills = filterSkills;
-
-    window.addEventListener('DOMContentLoaded', () => {
-      hideSkeleton();
-    });
   </script>
 </Layout>

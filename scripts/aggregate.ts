@@ -55,7 +55,18 @@ function writeSkillContent(skill: SkillDoc): void {
     name: skill.id,
     title: skill.title,
     description: skill.description,
+    version: skill.version,
     tags: skill.tags,
+    frameworks: skill.frameworks,
+    testTypes: skill.testTypes,
+    level: skill.level,
+    status: skill.status,
+    estimatedTime: skill.estimatedTime,
+    hasExamples: skill.hasExamples,
+    hasTemplates: skill.hasTemplates,
+    hasEvals: skill.hasEvals,
+    hasScripts: skill.hasScripts,
+    recommendedCommands: skill.recommendedCommands,
     repoId: skill.repoId,
     repoName: skill.repoName
   });

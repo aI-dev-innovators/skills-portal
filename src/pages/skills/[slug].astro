@@ -32,13 +32,40 @@ const html = mdToHtml(skill.content);
       <p class="badge">{skill.repoName || skill.repoId || 'Repositorio'}</p>
       <h1>{skill.title}</h1>
       <p>{skill.description}</p>
-      <div>
+      <div class="tag-wrap">
         {skill.tags.map((tag) => (
           <span class="badge">{tag}</span>
         ))}
       </div>
     </div>
-    {/* version opcional si se agrega en frontmatter */}
+    <aside class="summary-card">
+      <p><strong>Nivel:</strong> {skill.level}</p>
+      <p><strong>Estado:</strong> {skill.status}</p>
+      <p><strong>Version:</strong> {skill.version}</p>
+      {typeof skill.estimatedTime === 'number' && <p><strong>Tiempo estimado:</strong> {skill.estimatedTime} min</p>}
+      {skill.frameworks.length > 0 && (
+        <p><strong>Frameworks:</strong> {skill.frameworks.join(', ')}</p>
+      )}
+      {skill.testTypes.length > 0 && (
+        <p><strong>Tipos de test:</strong> {skill.testTypes.join(', ')}</p>
+      )}
+      <div class="asset-wrap">
+        {skill.hasExamples && <span class="asset">Examples</span>}
+        {skill.hasTemplates && <span class="asset">Templates</span>}
+        {skill.hasEvals && <span class="asset">Evals</span>}
+        {skill.hasScripts && <span class="asset">Scripts</span>}
+      </div>
+      {skill.recommendedCommands.length > 0 && (
+        <div class="cmd-wrap">
+          <strong>Comandos sugeridos</strong>
+          <ul>
+            {skill.recommendedCommands.map((command) => (
+              <li><code>{command}</code></li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </aside>
   </div>
   <div class="skill-content" set:html={html}></div>
 
@@ -66,6 +93,48 @@ const html = mdToHtml(skill.content);
       color: var(--text);
     }
     .page-title .badge + .badge { margin-left: 0.3rem; }
+    .tag-wrap { margin-top: 0.45rem; }
+    .summary-card {
+      min-width: 260px;
+      padding: 0.85rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(2, 6, 23, 0.35);
+      display: grid;
+      gap: 0.35rem;
+    }
+    .summary-card p { font-size: 0.92rem; }
+    .summary-card strong { color: #e2e8f0; }
+    .asset-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-top: 0.2rem;
+    }
+    .asset {
+      font-size: 0.8rem;
+      border-radius: 999px;
+      padding: 0.15rem 0.55rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #dbeafe;
+    }
+    .cmd-wrap { margin-top: 0.25rem; }
+    .cmd-wrap ul {
+      margin: 0.4rem 0 0;
+      padding-left: 1rem;
+    }
+    .cmd-wrap li { margin: 0.2rem 0; }
+    .cmd-wrap code {
+      color: #f8fafc;
+      background: rgba(148, 163, 184, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 0.05rem 0.35rem;
+      border-radius: 6px;
+    }
+    @media (max-width: 900px) {
+      .page-title { flex-direction: column; }
+      .summary-card { width: 100%; }
+    }
     .skill-content { margin-top: 1.25rem; }
   </style>
 </Layout>

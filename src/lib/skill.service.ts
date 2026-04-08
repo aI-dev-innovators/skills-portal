@@ -4,6 +4,9 @@ import { RepoConfig } from './config';
 import { buildContentsUrl, fetchJson, fetchRepositoryFileText, GitHubContentEntry } from './github.service';
 import { getRepoContext, RepoContext } from './repo.service';
 
+type SkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
+type SkillStatus = 'draft' | 'stable' | 'recommended' | 'deprecated';
+
 /** Documento de skill normalizado para renderizado y búsqueda. */
 export interface SkillDoc {
   /** Identificador único estable del skill dentro del portal. */
@@ -22,6 +25,47 @@ export interface SkillDoc {
   url: string;
   /** Contenido markdown original del SKILL.md. */
   content: string;
+  /** Frameworks principales de la skill para filtros. */
+  frameworks: string[];
+  /** Tipos de prueba soportados por la skill. */
+  testTypes: string[];
+  /** Nivel de complejidad estimado para consumo. */
+  level: SkillLevel;
+  /** Estado editorial de la skill. */
+  status: SkillStatus;
+  /** Version declarada por frontmatter o skill.json. */
+  version: string;
+  /** Tiempo estimado de adopcion en minutos. */
+  estimatedTime: number | null;
+  /** Indica si el skill incluye ejemplos. */
+  hasExamples: boolean;
+  /** Indica si el skill incluye plantillas. */
+  hasTemplates: boolean;
+  /** Indica si el skill incluye evaluaciones. */
+  hasEvals: boolean;
+  /** Indica si el skill incluye scripts de apoyo. */
+  hasScripts: boolean;
+  /** Comandos sugeridos para ejecutar o validar la skill. */
+  recommendedCommands: string[];
+}
+
+interface SkillJsonMetadata {
+  frameworks?: unknown;
+  testTypes?: unknown;
+  level?: unknown;
+  status?: unknown;
+  version?: unknown;
+  estimatedTime?: unknown;
+  recommendedCommands?: unknown;
+  recommended_commands?: unknown;
+  tags?: unknown;
+}
+
+interface SkillAssetFlags {
+  hasExamples: boolean;
+  hasTemplates: boolean;
+  hasEvals: boolean;
+  hasScripts: boolean;
 }
 
 /** Tiempo de vida de la cache por repositorio en milisegundos. */
@@ -43,6 +87,68 @@ function compact<T extends Record<string, unknown>>(obj: T): Partial<T> {
     if (value !== undefined) clean[key] = value;
   });
   return clean as Partial<T>;
+}
+
+function toStringArray(value: unknown, lowerCase = true): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    .map((entry) => {
+      const normalized = entry.trim();
+      return lowerCase ? normalized.toLowerCase() : normalized;
+    });
+}
+
+function toSkillLevel(value: unknown): SkillLevel {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'beginner') return 'beginner';
+  if (normalized === 'advanced') return 'advanced';
+  if (normalized === 'expert') return 'expert';
+  return 'intermediate';
+}
+
+function toSkillStatus(value: unknown): SkillStatus {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'draft') return 'draft';
+  if (normalized === 'recommended') return 'recommended';
+  if (normalized === 'deprecated') return 'deprecated';
+  return 'stable';
+}
+
+function toEstimatedTime(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return Math.floor(parsed);
+    }
+  }
+
+  return null;
+}
+
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function inferFrameworks(repo: RepoConfig, tags: string[]): string[] {
+  const candidates = unique([...(repo.tags || []).map((tag) => tag.toLowerCase()), ...tags]);
+  const frameworks = candidates.filter((tag) => ['angular', 'typescript', 'react', 'node', 'vue', 'svelte'].includes(tag));
+  if (frameworks.length > 0) return frameworks;
+  if (repo.id.includes('angular')) return ['angular'];
+  if (repo.id.includes('typescript')) return ['typescript'];
+  return ['testing'];
+}
+
+function inferTestTypes(tags: string[]): string[] {
+  const known = tags.filter((tag) => ['unit', 'integration', 'e2e', 'contract', 'performance', 'unit-testing'].includes(tag));
+  if (known.includes('unit-testing') && !known.includes('unit')) {
+    known.push('unit');
+  }
+  return unique(known.length ? known : ['unit']);
 }
 
 /**
@@ -126,6 +232,48 @@ async function fetchSkillFile(context: RepoContext, filePath: string): Promise<s
   return fetchRepositoryFileText(context.slug.owner, context.slug.name, filePath, context.defaultBranch);
 }
 
+async function fetchSkillJson(context: RepoContext, skillFilePath: string): Promise<SkillJsonMetadata | null> {
+  const skillDir = path.posix.dirname(skillFilePath);
+  const listUrl = buildContentsUrl(context.slug.owner, context.slug.name, skillDir, context.defaultBranch);
+  const entries = await fetchJson<GitHubContentEntry[]>(listUrl);
+  if (!entries?.length) return null;
+
+  const skillJsonEntry = entries.find(
+    (entry) => entry.type === 'file' && entry.name.toLowerCase() === 'skill.json'
+  );
+
+  if (!skillJsonEntry) return null;
+
+  const raw = await fetchRepositoryFileText(
+    context.slug.owner,
+    context.slug.name,
+    skillJsonEntry.path,
+    context.defaultBranch
+  );
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as SkillJsonMetadata;
+  } catch {
+    console.warn(`[skills:${context.repo.id}] skill.json invalido en ${skillJsonEntry.path}`);
+    return null;
+  }
+}
+
+async function readSkillAssetFlags(context: RepoContext, skillFilePath: string): Promise<SkillAssetFlags> {
+  const skillDir = path.posix.dirname(skillFilePath);
+  const listUrl = buildContentsUrl(context.slug.owner, context.slug.name, skillDir, context.defaultBranch);
+  const entries = await fetchJson<GitHubContentEntry[]>(listUrl);
+  const folders = new Set((entries || []).filter((entry) => entry.type === 'dir').map((entry) => entry.name.toLowerCase()));
+
+  return {
+    hasExamples: folders.has('examples'),
+    hasTemplates: folders.has('templates'),
+    hasEvals: folders.has('evals'),
+    hasScripts: folders.has('scripts')
+  };
+}
+
 /**
  * Recolecta y normaliza los SKILL.md de un repositorio remoto.
  *
@@ -157,14 +305,38 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
       return null;
     }
 
+    const [skillJson, assets] = await Promise.all([fetchSkillJson(context, filePath), readSkillAssetFlags(context, filePath)]);
+
     const parsed = matter(raw);
     const fallback = path.basename(path.dirname(filePath)) || path.basename(filePath);
     const baseValue = String(parsed.data?.name || fallback);
     const skillId = createUniqueSkillId(repo.id, baseValue, usedIds);
+    const frontmatterTags = toStringArray(parsed.data?.tags);
+    const jsonTags = toStringArray(skillJson?.tags);
+    const tags = unique([...frontmatterTags, ...jsonTags]);
+    const frameworks = unique([
+      ...toStringArray(parsed.data?.frameworks),
+      ...toStringArray(skillJson?.frameworks),
+      ...inferFrameworks(repo, tags)
+    ]);
+    const testTypes = unique([
+      ...toStringArray(parsed.data?.testTypes),
+      ...toStringArray(skillJson?.testTypes),
+      ...inferTestTypes(tags)
+    ]);
+    const recommendedCommands = unique([
+      ...toStringArray(parsed.data?.recommendedCommands, false),
+      ...toStringArray(skillJson?.recommendedCommands, false),
+      ...toStringArray(skillJson?.recommended_commands, false)
+    ]);
+    const level = toSkillLevel(parsed.data?.level || skillJson?.level);
+    const status = toSkillStatus(parsed.data?.status || skillJson?.status);
+    const version = String(parsed.data?.version || skillJson?.version || '1.0.0');
+    const estimatedTime = toEstimatedTime(parsed.data?.estimatedTime || skillJson?.estimatedTime);
     const frontmatter = compact({
       title: parsed.data?.title || baseValue,
       description: parsed.data?.description || 'Descripcion pendiente',
-      tags: Array.isArray(parsed.data?.tags) ? parsed.data.tags : []
+      tags
     });
 
     return {
@@ -175,7 +347,18 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
       repoId: repo.id,
       repoName: repo.name,
       url: `/skills/${skillId}`,
-      content: parsed.content
+      content: parsed.content,
+      frameworks,
+      testTypes,
+      level,
+      status,
+      version,
+      estimatedTime,
+      hasExamples: assets.hasExamples,
+      hasTemplates: assets.hasTemplates,
+      hasEvals: assets.hasEvals,
+      hasScripts: assets.hasScripts,
+      recommendedCommands
     } satisfies SkillDoc;
   });
 
