@@ -14,3 +14,11 @@ repos:
     readmePath: README.md
     skillsPath: skills
     tags: [frontend, typescript]
+
+  - id: unit-tests-skills
+    name: Unit Tests Skills
+    repoUrl: git@github.com:aI-dev-innovators/unit-tests-skills.git
+    defaultBranch: main
+    readmePath: README.md
+    skillsPath: skills
+    tags: [testing, unit-tests]
