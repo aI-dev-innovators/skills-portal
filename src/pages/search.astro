@@ -14,20 +14,36 @@ import Layout from '../layouts/Layout.astro';
   <div id="results" style="margin-top: 1.5rem;"></div>
 </Layout>
 
-<script type="module">
+<script>
   import lunr from 'lunr';
+  import { getRecentSearches, trackSearchQuery } from '../lib/client-telemetry';
 
-  const input = document.getElementById('search-input');
-  const results = document.getElementById('results');
+  type SearchDocument = {
+    id: string;
+    url: string;
+    title: string;
+    description: string;
+    tags?: string[];
+  };
 
-  let index = null;
-  let documents = [];
+  type SearchHit = {
+    ref: string;
+  };
+
+  const input = document.getElementById('search-input') as HTMLInputElement | null;
+  const results = document.getElementById('results') as HTMLDivElement | null;
+  const pageTitle = document.querySelector('.page-title');
+
+  let index: lunr.Index | null = null;
+  let documents: SearchDocument[] = [];
+  let recentSearchesContainer: HTMLDivElement | null = null;
+  let searchDebounce: number | null = null;
 
   async function loadIndex() {
     try {
       const res = await fetch('/search-index.json');
       if (!res.ok) return;
-      const data = await res.json();
+      const data = await res.json() as { documents?: SearchDocument[]; index?: unknown };
       documents = data.documents || [];
       index = data.index ? lunr.Index.load(data.index) : null;
     } catch (err) {
@@ -35,31 +51,97 @@ import Layout from '../layouts/Layout.astro';
     }
   }
 
-  function renderResults(items) {
+  function renderResults(items: SearchHit[]) {
     if (!results) return;
     if (!items.length) {
       results.innerHTML = '<p>No hay resultados.</p>';
       return;
     }
     results.innerHTML = items
-      .map((item) => {
-        const doc = documents.find((d) => d.id === item.ref);
+      .map((item: SearchHit) => {
+        const doc = documents.find((d: SearchDocument) => d.id === item.ref);
         if (!doc) return '';
-        return `<article class="card"><h3><a href="${doc.url}">${doc.title}</a></h3><p>${doc.description}</p><div>${(doc.tags || []).map((t) => `<span class="badge">${t}</span>`).join('')}</div></article>`;
+        return `<article class="card"><h3><a href="${doc.url}">${doc.title}</a></h3><p>${doc.description}</p><div>${(doc.tags || []).map((t: string) => `<span class="badge">${t}</span>`).join('')}</div></article>`;
       })
       .join('');
   }
 
-  async function onSearch(event) {
-    const term = event.target.value.trim();
+  function renderRecentSearches() {
+    const searches = getRecentSearches(6);
+    if (!recentSearchesContainer) return;
+    if (!searches.length) {
+      recentSearchesContainer.innerHTML = '<p class="recent-empty">Sin historial todavía.</p>';
+      return;
+    }
+
+    recentSearchesContainer.innerHTML = searches
+      .map((entry) => `<button class="recent-chip" type="button" data-term="${entry.term}">${entry.term}</button>`)
+      .join('');
+  }
+
+  function onSearch(event: Event | { target: HTMLInputElement }) {
+    const target = event.target as HTMLInputElement | null;
+    const term = target?.value.trim() || '';
     if (!term || !index) {
       renderResults([]);
       return;
     }
-    const hits = index.search(term);
+
+    if (searchDebounce !== null) {
+      window.clearTimeout(searchDebounce);
+    }
+    searchDebounce = window.setTimeout(() => trackSearchQuery(term), 250);
+    const hits = index.search(term) as SearchHit[];
     renderResults(hits);
   }
 
   await loadIndex();
+  if (pageTitle) {
+    const panel = document.createElement('div');
+    panel.className = 'recent-panel';
+    panel.innerHTML = '<h2>Búsquedas recientes</h2><div id="recent-searches-inline"></div>';
+    pageTitle.insertAdjacentElement('afterend', panel);
+    recentSearchesContainer = document.getElementById('recent-searches-inline') as HTMLDivElement | null;
+    renderRecentSearches();
+    panel.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLButtonElement)) return;
+      const term = target.dataset.term || '';
+      if (!input || !term) return;
+      input.value = term;
+      onSearch({ target: input });
+    });
+  }
   if (input) input.addEventListener('input', onSearch);
 </script>
+
+<style>
+  .recent-panel {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .recent-panel h2 {
+    margin: 0 0 0.8rem;
+    font-size: 1rem;
+  }
+  #recent-searches-inline {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .recent-chip {
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid rgba(56, 189, 248, 0.32);
+    background: rgba(56, 189, 248, 0.08);
+    color: #bae6fd;
+    cursor: pointer;
+  }
+  .recent-empty {
+    margin: 0;
+    color: #94a3b8;
+  }
+</style>

@@ -19,12 +19,24 @@ requireToken();
 const repos = readReposConfig();
 // Busca el skill en los repos registrados y trae su markdown.
 const skill = await fetchSkillBySlug(repos, slug);
+const allSkills = await collectAllSkills(repos);
 
 if (!skill) {
   return Astro.redirect('/skills');
 }
 
 const html = mdToHtml(skill.content);
+const recommendationCatalog = allSkills.map((entry) => ({
+  id: entry.id,
+  title: entry.title,
+  url: entry.url,
+  description: entry.description,
+  repoName: entry.repoName,
+  frameworks: entry.frameworks,
+  testTypes: entry.testTypes,
+  tags: entry.tags,
+  score: entry.score
+}));
 ---
 <Layout title={skill.title} description={skill.description}>
   <div class="page-title">
@@ -65,9 +77,27 @@ const html = mdToHtml(skill.content);
           </ul>
         </div>
       )}
+      <div class="telemetry-panel">
+        <strong>¿Te sirvió esta skill?</strong>
+        <div class="vote-row" id="helpful-vote-actions">
+          <button type="button" class="vote-button" data-vote="helpful">Sí</button>
+          <button type="button" class="vote-button" data-vote="not-helpful">No</button>
+        </div>
+        <p class="telemetry-meta" id="skill-view-meta">Sin vistas registradas todavía.</p>
+        <p class="telemetry-meta" id="skill-vote-meta">Aún no hay votos.</p>
+      </div>
     </aside>
   </div>
   <div class="skill-content" set:html={html}></div>
+  <section class="recommend-section">
+    <div class="recommend-head">
+      <p class="badge">Personalización ligera</p>
+      <h2>Relacionadas para ti</h2>
+    </div>
+    <div id="recommended-skills-detail" class="recommend-grid">
+      <p class="recommend-empty">Explora más skills para mejorar estas sugerencias.</p>
+    </div>
+  </section>
 
   <style>
     .page-title {
@@ -131,10 +161,154 @@ const html = mdToHtml(skill.content);
       padding: 0.05rem 0.35rem;
       border-radius: 6px;
     }
+    .telemetry-panel {
+      margin-top: 0.4rem;
+      padding-top: 0.6rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: grid;
+      gap: 0.45rem;
+    }
+    .vote-row {
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+    .vote-button {
+      padding: 0.45rem 0.8rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.03);
+      color: #e5e7eb;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .vote-button.is-active {
+      background: rgba(16, 185, 129, 0.14);
+      border-color: rgba(16, 185, 129, 0.42);
+      color: #a7f3d0;
+    }
+    .vote-button[data-vote="not-helpful"].is-active {
+      background: rgba(244, 63, 94, 0.14);
+      border-color: rgba(244, 63, 94, 0.42);
+      color: #fecdd3;
+    }
+    .telemetry-meta {
+      margin: 0;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+    .recommend-section {
+      margin-top: 1.25rem;
+      padding: 1rem;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .recommend-head h2 {
+      margin: 0.35rem 0 0.85rem;
+    }
+    .recommend-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.75rem;
+    }
+    .recommend-card {
+      padding: 0.9rem;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .recommend-card a {
+      color: #e5e7eb;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .recommend-card p,
+    .recommend-card span {
+      margin: 0.3rem 0 0;
+      color: #94a3b8;
+      font-size: 0.88rem;
+    }
+    .recommend-empty {
+      margin: 0;
+      color: #94a3b8;
+    }
     @media (max-width: 900px) {
       .page-title { flex-direction: column; }
       .summary-card { width: 100%; }
     }
     .skill-content { margin-top: 1.25rem; }
   </style>
+
+  <script>
+    import {
+      getHelpfulVoteStats,
+      getRecommendedSkills,
+      getSkillViewStats,
+      trackHelpfulVote,
+      trackSkillView
+    } from '../../lib/client-telemetry';
+
+    const skillProfile = JSON.parse(document.getElementById('skill-profile-json')?.textContent || '{}');
+    const recommendationCatalog = JSON.parse(document.getElementById('skill-recommendation-catalog')?.textContent || '[]');
+    const voteContainer = document.getElementById('helpful-vote-actions');
+    const viewMeta = document.getElementById('skill-view-meta');
+    const voteMeta = document.getElementById('skill-vote-meta');
+    const recommendationsContainer = document.getElementById('recommended-skills-detail');
+
+    function renderVoteState() {
+      const stats = getHelpfulVoteStats(skillProfile.id);
+      const buttons = voteContainer?.querySelectorAll('.vote-button') || [];
+      buttons.forEach((button) => {
+        if (!(button instanceof HTMLButtonElement)) return;
+        button.classList.toggle('is-active', button.dataset.vote === stats.userVote);
+      });
+      if (voteMeta) {
+        voteMeta.textContent = `${stats.helpful} útil · ${stats.notHelpful} no útil`;
+      }
+    }
+
+    const viewEntry = trackSkillView(skillProfile);
+    if (viewMeta && viewEntry) {
+      viewMeta.textContent = `${viewEntry.count} vistas locales · última visita ${new Date(viewEntry.lastViewedAt).toLocaleDateString('es-ES')}`;
+    } else if (viewMeta) {
+      const currentViewStats = getSkillViewStats(skillProfile.id);
+      if (currentViewStats) {
+        viewMeta.textContent = `${currentViewStats.count} vistas locales · última visita ${new Date(currentViewStats.lastViewedAt).toLocaleDateString('es-ES')}`;
+      }
+    }
+
+    renderVoteState();
+    voteContainer?.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLButtonElement)) return;
+      const vote = target.dataset.vote;
+      if (vote !== 'helpful' && vote !== 'not-helpful') return;
+      trackHelpfulVote(skillProfile.id, vote);
+      renderVoteState();
+    });
+
+    const recommended = getRecommendedSkills(recommendationCatalog, skillProfile.id, 4);
+    if (recommendationsContainer && recommended.length > 0) {
+      recommendationsContainer.innerHTML = recommended.map((entry) => `
+        <article class="recommend-card">
+          <a href="${entry.url}">${entry.title}</a>
+          <p>${entry.description || 'Skill relacionada.'}</p>
+          <span>${entry.repoName || 'Skill'} · ${((entry.score || 0) * 100).toFixed(1)}%</span>
+        </article>
+      `).join('');
+    }
+  </script>
+  <script id="skill-profile-json" type="application/json" set:html={JSON.stringify({
+    id: skill.id,
+    title: skill.title,
+    url: skill.url,
+    description: skill.description,
+    repoName: skill.repoName,
+    frameworks: skill.frameworks,
+    testTypes: skill.testTypes,
+    tags: skill.tags,
+    score: skill.score
+  })}></script>
+  <script id="skill-recommendation-catalog" type="application/json" set:html={JSON.stringify(recommendationCatalog)}></script>
 </Layout>
