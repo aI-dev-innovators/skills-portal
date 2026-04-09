@@ -1,0 +1,375 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { readReposConfig } from '../lib/config';
+import { collectAllSkills } from '../lib/skill.service';
+import { rankSkills, getPercentileRank, type SkillScore } from '../lib/ranking.service';
+import { getBadgeDefinition } from '../lib/badge.service';
+import type { BadgeType } from '../lib/badge.service';
+import type { SkillDoc } from '../lib/skill.service';
+
+const repos = readReposConfig();
+const skills = await collectAllSkills(repos);
+const ranked = rankSkills(skills);
+
+function formatScore(score: number): string {
+  return (score * 100).toFixed(1);
+}
+
+function getBadgeHTML(badgeType: BadgeType) {
+  const def = getBadgeDefinition(badgeType);
+  const colorMap: Record<string, string> = {
+    'green': '#10b981',
+    'blue': '#3b82f6',
+    'purple': '#a855f7',
+    'amber': '#f59e0b',
+    'pink': '#ec4899'
+  };
+  return {
+    label: def.label,
+    icon: def.icon,
+    color: colorMap[def.color],
+    tooltip: def.tooltip
+  };
+}
+---
+
+<Layout title="Rankings" description="Skills ordenados por score y popularidad">
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">Rankings</p>
+      <h1>Skills ordenados por score y madurez</h1>
+      <p class="lede">
+        Descubre los skills mejor valorados según su score composite: popularidad del repo, actividad reciente, completeness de assets y más.
+      </p>
+      <div class="score-formula">
+        <p>Score = 0.30·⭐ + 0.20·🔄 + 0.20·✓ + 0.20·👁 + 0.10·👍</p>
+        <small>Estrellas · Actividad · Completeness · Vistas · Votos</small>
+      </div>
+    </div>
+  </section>
+
+  <section class="ranking-section">
+    <div class="ranking-header">
+      <p class="eyebrow">Top {ranked.length}</p>
+      <h2>Ranking de Skills</h2>
+    </div>
+
+    <div class="ranking-table">
+      {ranked.map((skillScore: SkillScore, index: number) => {
+        const skill = skills.find((s: SkillDoc) => s.id === skillScore.skillId);
+        if (!skill) return null;
+        const percentile = getPercentileRank(skills, skillScore.skillId);
+        
+        return (
+          <article class="ranking-row">
+            <div class="rank-badge">
+              <span class="rank-num">#{index + 1}</span>
+              <span class="percentile">{percentile}th</span>
+            </div>
+            <div class="rank-content">
+              <div class="rank-header">
+                <a href={skill.url} class="skill-title">{skill.title}</a>
+                <div class="skill-meta">
+                  <span class="repo-ref">{skill.repoName}</span>
+                  <span class="level-badge">{skill.level}</span>
+                </div>
+              </div>
+              <p class="skill-desc">{skill.description}</p>
+              <div class="badges-row">
+                {skill.badges.map((badge: BadgeType) => {
+                  const badgeInfo = getBadgeHTML(badge);
+                  return (
+                    <span 
+                      class="skill-badge" 
+                      title={badgeInfo.tooltip}
+                      style={`background: ${badgeInfo.color}20; border-color: ${badgeInfo.color}50; color: ${badgeInfo.color}`}
+                    >
+                      {badgeInfo.icon} {badgeInfo.label}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+            <div class="rank-score">
+              <div class="score-main">
+                <span class="score-value">{formatScore(skillScore.score)}</span>
+                <span class="score-percent">%</span>
+              </div>
+              <div class="score-breakdown">
+                <div class="component">
+                  <span class="label">⭐</span>
+                  <span class="value">{formatScore(skillScore.components.repoStars)}</span>
+                </div>
+                <div class="component">
+                  <span class="label">🔄</span>
+                  <span class="value">{formatScore(skillScore.components.recentActivity)}</span>
+                </div>
+                <div class="component">
+                  <span class="label">✓</span>
+                  <span class="value">{formatScore(skillScore.components.completeness)}</span>
+                </div>
+              </div>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  </section>
+
+  <style>
+    :global(body) {
+      background: #07090f;
+      color: #e5e7eb;
+    }
+
+    .hero {
+      background: radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.12), transparent 35%),
+        radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.16), transparent 32%),
+        #0c101a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.8rem;
+      color: #a5b4fc;
+      margin: 0 0 0.4rem;
+    }
+
+    h1 {
+      margin: 0 0 0.6rem;
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      letter-spacing: -0.02em;
+    }
+
+    .lede {
+      color: #cbd5e1;
+      margin: 0.6rem 0 1.2rem;
+      max-width: 720px;
+      line-height: 1.5;
+    }
+
+    .score-formula {
+      background: rgba(148, 163, 184, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .score-formula p {
+      margin: 0 0 0.2rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #e0f2fe;
+    }
+
+    .score-formula small {
+      color: #94a3b8;
+      font-size: 0.85rem;
+    }
+
+    .ranking-section {
+      margin-top: 2rem;
+    }
+
+    .ranking-header {
+      margin-bottom: 1.5rem;
+    }
+
+    .ranking-header h2 {
+      margin: 0.1rem 0;
+      font-size: clamp(1.6rem, 2.5vw, 2rem);
+      letter-spacing: -0.02em;
+    }
+
+    .ranking-table {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .ranking-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 200px;
+      gap: 1rem;
+      align-items: center;
+      padding: 1rem 1.25rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      transition: all 0.2s;
+    }
+
+    .ranking-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.12);
+      transform: translateX(4px);
+    }
+
+    .rank-badge {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .rank-num {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #bae6fd;
+    }
+
+    .percentile {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .rank-content {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .rank-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .skill-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #e5e7eb;
+      text-decoration: none;
+      margin: 0;
+    }
+
+    .skill-title:hover {
+      color: #bae6fd;
+    }
+
+    .skill-meta {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .repo-ref {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      text-transform: lowercase;
+      letter-spacing: 0.05em;
+    }
+
+    .level-badge {
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #bae6fd;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .skill-desc {
+      font-size: 0.95rem;
+      color: #cbd5e1;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    .badges-row {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      margin-top: 0.4rem;
+    }
+
+    .skill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      border: 1px solid;
+      font-weight: 600;
+    }
+
+    .rank-score {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.6rem;
+    }
+
+    .score-main {
+      display: flex;
+      align-items: baseline;
+      gap: 0.2rem;
+    }
+
+    .score-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #bae6fd;
+    }
+
+    .score-percent {
+      font-size: 0.9rem;
+      color: #94a3b8;
+    }
+
+    .score-breakdown {
+      display: flex;
+      gap: 0.6rem;
+      font-size: 0.8rem;
+    }
+
+    .component {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.1rem;
+    }
+
+    .component .label {
+      color: #94a3b8;
+    }
+
+    .component .value {
+      color: #cbd5e1;
+      font-weight: 600;
+    }
+
+    @media (max-width: 1024px) {
+      .ranking-row {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+      }
+
+      .rank-badge {
+        flex-direction: row;
+        justify-content: space-between;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .rank-score {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 0.5rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+    }
+  </style>
+</Layout>

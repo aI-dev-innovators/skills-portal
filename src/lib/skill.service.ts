@@ -2,7 +2,10 @@ import path from 'node:path';
 import matter from 'gray-matter';
 import { RepoConfig } from './config';
 import { buildContentsUrl, fetchJson, fetchRepositoryFileText, GitHubContentEntry } from './github.service';
-import { getRepoContext, RepoContext } from './repo.service';
+import { getRepoContext, RepoContext, fetchRepoMetrics } from './repo.service';
+import type { BadgeType } from './badge.service';
+import { generateBadges } from './badge.service';
+import { calculateSkillScore } from './ranking.service';
 
 type SkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
 type SkillStatus = 'draft' | 'stable' | 'recommended' | 'deprecated';
@@ -47,6 +50,14 @@ export interface SkillDoc {
   hasScripts: boolean;
   /** Comandos sugeridos para ejecutar o validar la skill. */
   recommendedCommands: string[];
+  /** Badges automáticos generados basados en qualidad y activos. */
+  badges: BadgeType[];
+  /** Score numérico para ranking (0-1). */
+  score: number;
+  /** Estrellas del repositorio origen. */
+  repoStars: number;
+  /** Fecha de última actualización (ISO string). */
+  lastUpdated: string | null;
 }
 
 interface SkillJsonMetadata {
@@ -294,6 +305,9 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
     return [];
   }
 
+  // Fetch repo metrics once for all skills
+  const metrics = await fetchRepoMetrics(repo, context);
+
   const files = await listSkillFiles(context);
   console.log(`[skills:${repo.id}] archivos SKILL.md detectados: ${files.length}`);
   const usedIds = new Set<string>();
@@ -339,7 +353,8 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
       tags
     });
 
-    return {
+    // Create temporary skill object for badge/score calculation
+    const tempSkill = {
       id: skillId,
       title: String(frontmatter.title || baseValue),
       description: String(frontmatter.description || 'Descripcion pendiente'),
@@ -358,7 +373,24 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
       hasTemplates: assets.hasTemplates,
       hasEvals: assets.hasEvals,
       hasScripts: assets.hasScripts,
-      recommendedCommands
+      recommendedCommands,
+      // Ranking fields
+      repoStars: metrics.stars || 0,
+      lastUpdated: metrics.lastCommitDate || null
+    };
+
+    // Generate badges
+    const badges = generateBadges(tempSkill);
+    const badgeTypes = badges.map(b => b.type);
+
+    // Calculate score
+    const scoreData = calculateSkillScore(tempSkill);
+    const score = scoreData.score;
+
+    return {
+      ...tempSkill,
+      badges: badgeTypes,
+      score
     } satisfies SkillDoc;
   });
 

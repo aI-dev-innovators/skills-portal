@@ -3,6 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import { readReposConfig } from '../../lib/config';
 import { requireToken } from '../../lib/github.service';
 import { collectAllSkills } from '../../lib/skill.service';
+import { getBadgeDefinition } from '../../lib/badge.service';
 
 requireToken();
 const repos = readReposConfig();
@@ -156,6 +157,31 @@ const avgEstimatedTime =
                 <span class="tag type">{testType}</span>
               ))}
             </div>
+
+            {(skill.badges || []).length > 0 && (
+              <div class="badge-row">
+                {(skill.badges || []).map((badgeType) => {
+                  const badgeDef = getBadgeDefinition(badgeType);
+                  const colorMap = {
+                    'green': '#10b981',
+                    'blue': '#3b82f6',
+                    'purple': '#a855f7',
+                    'amber': '#f59e0b',
+                    'pink': '#ec4899'
+                  };
+                  const badgeColor = colorMap[badgeDef.color as keyof typeof colorMap];
+                  return (
+                    <span 
+                      class="auto-badge"
+                      title={badgeDef.tooltip}
+                      style={`background: ${badgeColor}20; border-color: ${badgeColor}50; color: ${badgeColor}`}
+                    >
+                      {badgeDef.icon} {badgeDef.label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
 
             <div class="asset-row">
               {skill.hasExamples && <span class="badge">Examples</span>}
@@ -371,6 +397,7 @@ const avgEstimatedTime =
 
     .meta-row,
     .taxonomy-row,
+    .badge-row,
     .asset-row {
       display: flex;
       gap: 0.35rem;
@@ -442,6 +469,22 @@ const avgEstimatedTime =
       background: rgba(16, 185, 129, 0.2);
       border-color: rgba(16, 185, 129, 0.45);
       color: #a7f3d0;
+    }
+
+    .auto-badge {
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      border: 1px solid;
+      color: #cbd5e1;
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 28px;
+      line-height: 1;
+      white-space: nowrap;
+      gap: 0.3rem;
     }
 
     a {
