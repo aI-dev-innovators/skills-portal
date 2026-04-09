@@ -124,7 +124,7 @@ async function processRepo(repo: RepoConfig): Promise<{ repoJson: RepoJson | nul
         name: repo.name,
         description: repo.description || '',
         tags: repo.tags || [],
-        url: `/repos/${repo.id}`
+        url: `/repos/${repo.id}/`
       },
       skills,
       ok: true

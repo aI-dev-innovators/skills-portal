@@ -182,7 +182,7 @@ export function getDefaultRepoOwner(): string {
  * const url = buildRepoApiUrl('octocat', 'hello-world', '/readme');
  */
 export function buildRepoApiUrl(owner: string, repo: string, endpoint: string): string {
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : endpoint.length > 0 ? `/${endpoint}` : '';
   return `${GITHUB_API_BASE_URL}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${cleanEndpoint}`;
 }
 

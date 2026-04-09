@@ -90,7 +90,7 @@ function formatShortDate(value: string | null): string {
             <div class="row-main">
               <div>
                 <p class="repo-id">{repo.id}</p>
-                <h3><a href={`/repos/${repo.id}`}>{repo.name}</a></h3>
+                <h3><a href={`/repos/${repo.id}/`}>{repo.name}</a></h3>
                 {repo.description && <p class="repo-desc">{repo.description}</p>}
                 <div class="tag-row">
                   {(repo.tags || []).map((tag) => (
@@ -107,7 +107,7 @@ function formatShortDate(value: string | null): string {
               </div>
             </div>
             <div class="row-cta">
-              <a class="ghost" href={`/repos/${repo.id}`}>Ver detalles →</a>
+              <a class="ghost" href={`/repos/${repo.id}/`}>Ver detalles →</a>
             </div>
           </article>
         );

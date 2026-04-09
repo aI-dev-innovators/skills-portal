@@ -361,7 +361,7 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
       tags: (frontmatter.tags as string[]) || [],
       repoId: repo.id,
       repoName: repo.name,
-      url: `/skills/${skillId}`,
+      url: `/skills/${skillId}/`,
       content: parsed.content,
       frameworks,
       testTypes,
