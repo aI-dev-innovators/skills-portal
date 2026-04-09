@@ -140,6 +140,7 @@ function formatShortDate(value: string | null): string {
       grid-template-columns: 2fr 1fr;
       gap: 1.5rem;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      margin: 0 0 1rem;
     }
     .eyebrow {
       text-transform: uppercase;
@@ -201,63 +202,139 @@ function formatShortDate(value: string | null): string {
       color: #e5e7eb;
     }
 
-    .repo-section { margin-top: 2rem; }
-    .repo-header h2 { margin: 0.2rem 0 0.8rem; }
+    .repo-section { 
+      margin-top: 3rem;
+    }
+    .repo-header {
+      margin-bottom: 1.5rem;
+    }
+    .repo-header .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.8rem;
+      color: #a5b4fc;
+      margin: 0 0 0.4rem;
+    }
+    .repo-header h2 { 
+      margin: 0.2rem 0 0.8rem;
+      font-size: clamp(1.6rem, 2.5vw, 2rem);
+      letter-spacing: -0.02em;
+    }
     .repo-list {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 1rem;
     }
     .repo-row {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       gap: 1rem;
-      padding: 1rem 1.25rem;
+      padding: 1.25rem 1.5rem;
       background: rgba(255, 255, 255, 0.02);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 12px;
+      transition: background 0.2s, border-color 0.2s;
     }
-    .row-main h3 { margin: 0.1rem 0; }
-    .repo-id { color: #94a3b8; margin: 0; font-size: 0.9rem; }
-    .repo-desc { margin: 0.35rem 0 0.6rem; color: #cbd5e1; }
-    .tag-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+    .repo-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+    .row-main {
+      flex: 1;
+      min-width: 0;
+    }
+    .row-main h3 { 
+      margin: 0.1rem 0 0.35rem;
+      font-size: 1.1rem;
+    }
+    .repo-id { 
+      color: #94a3b8; 
+      margin: 0 0 0.3rem; 
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      text-transform: lowercase;
+    }
+    .repo-desc { 
+      margin: 0.4rem 0 0.7rem; 
+      color: #cbd5e1;
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+    .tag-row { 
+      display: flex; 
+      gap: 0.5rem; 
+      flex-wrap: wrap;
+      margin-bottom: 0.6rem;
+    }
     .tag {
-      padding: 0.2rem 0.7rem;
+      padding: 0.3rem 0.8rem;
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.12);
       color: #cbd5e1;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       background: rgba(148, 163, 184, 0.1);
+      white-space: nowrap;
     }
     .metrics-row {
-      margin-top: 0.7rem;
+      margin-top: 0.8rem;
       display: flex;
-      gap: 0.4rem;
+      gap: 0.5rem;
       flex-wrap: wrap;
+      align-items: center;
     }
     .metric {
-      padding: 0.2rem 0.6rem;
+      padding: 0.3rem 0.7rem;
       border-radius: 999px;
       border: 1px solid rgba(56, 189, 248, 0.35);
       background: rgba(56, 189, 248, 0.1);
       color: #bae6fd;
-      font-size: 0.82rem;
+      font-size: 0.8rem;
+      white-space: nowrap;
     }
-    .row-cta { align-self: center; }
+    .row-cta { 
+      align-self: center;
+      flex-shrink: 0;
+      padding-left: 1rem;
+    }
     .ghost {
       color: #a5b4fc;
       text-decoration: none;
       font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      transition: all 0.2s;
+      border: 1px solid rgba(165, 180, 252, 0.3);
     }
-    .ghost:hover { color: #c7d2fe; }
+    .ghost:hover { 
+      color: #c7d2fe;
+      background: rgba(165, 180, 252, 0.1);
+      border-color: rgba(165, 180, 252, 0.5);
+    }
     a { color: #e0f2fe; }
     a:hover { color: #67e8f9; }
 
     @media (max-width: 800px) {
-      .hero { grid-template-columns: 1fr; }
-      .row-cta { width: 100%; text-align: right; }
-      .repo-row { flex-direction: column; }
+      .hero { 
+        grid-template-columns: 1fr;
+        padding: 1.5rem;
+      }
+      .row-cta { 
+        width: 100%; 
+        text-align: right;
+        padding-left: 0;
+        padding-top: 0.5rem;
+      }
+      .repo-row { 
+        flex-direction: column;
+        padding: 1rem 1.25rem;
+      }
+      .repo-desc {
+        margin: 0.3rem 0 0.6rem;
+      }
     }
   </style>
 
