@@ -142,29 +142,31 @@ $$
 Nota:
 `skillViews` y `helpfulVotes` requieren telemetría propia del portal.
 
-### Fase 4. Telemetría y personalización ligera
+### Fase 4. Persistencia real de telemetría
 
 Objetivo:
-medir uso real de skills dentro del portal sin convertirlo en una plataforma pesada.
+llevar la instrumentación ya implementada en cliente hacia una capa persistente y compartida, usable por ranking, activity feed y señales editoriales reales.
 
-Entregables:
+Pendiente:
 
-- Tracking de vistas por skill.
-- Tracking de clics y búsquedas.
-- Señal “esta skill fue útil”.
-- Recomendador simple por navegación reciente.
+- Crear endpoints server-side en Astro para registrar eventos del portal.
+- Persistir eventos en SQLite o Turso con bajo costo operativo.
+- Consolidar métricas agregadas para home, rankings y detalle de skills.
+- Alimentar `skillViews` y `helpfulVotes` reales dentro del score de ranking.
+- Registrar aperturas hacia fuente externa (`skill_open_source`) además de vistas locales.
 
-Persistencia sugerida:
-
-- SQLite o Turso para bajo costo operativo.
-- Endpoints server-side en Astro para registrar eventos simples.
-
-Eventos mínimos:
+Eventos a persistir:
 
 - `skill_view`
 - `skill_open_source`
 - `search_query`
 - `helpful_vote`
+
+Criterios de cierre:
+
+- Las métricas sobreviven recargas, sesiones y dispositivos.
+- `/rankings` deja de depender de placeholders para vistas y votos.
+- El bloque de recent activity se alimenta desde datos persistidos y no solo desde memoria local del navegador.
 
 ## Arquitectura objetivo del portal
 
