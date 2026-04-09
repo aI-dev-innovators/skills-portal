@@ -22,3 +22,27 @@ repos:
     readmePath: README.md
     skillsPath: skills
     tags: [testing, unit-tests]
+
+  - id: developer-workflow-skills
+    name: Developer Workflow Skills
+    repoUrl: git@github.com:aI-dev-innovators/developer-workflow-skills.git
+    defaultBranch: main
+    readmePath: README.md
+    skillsPath: skills
+    tags: [workflow, developer]
+
+  - id: scaffolding-skills
+    name: Scaffolding Skills
+    repoUrl: git@github.com:aI-dev-innovators/scaffolding-skills.git
+    defaultBranch: main
+    readmePath: README.md
+    skillsPath: skills
+    tags: [scaffolding, tooling]
+
+  - id: documentation-skills
+    name: Documentation Skills
+    repoUrl: git@github.com:aI-dev-innovators/documentation-skills.git
+    defaultBranch: main
+    readmePath: README.md
+    skillsPath: skills
+    tags: [documentation, writing]
