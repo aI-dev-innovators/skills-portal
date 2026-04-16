@@ -87,42 +87,40 @@ const skillFileWebUrl = repoContext
   : null;
 ---
 <Layout title={skill.title} description={skill.description}>
-  <div class="page-title">
-    <div>
+  <section class="skill-hero">
+    <div class="skill-hero-main">
       <p class="badge">{skill.repoName || skill.repoId || 'Repositorio'}</p>
       <h1>{skill.title}</h1>
       <p>{skill.description}</p>
-      <div class="tag-wrap">
-        {skill.tags.map((tag) => (
-          <span class="badge">{tag}</span>
-        ))}
+      {skill.tags.length > 0 && (
+        <div class="tag-wrap">
+          {skill.tags.map((tag) => (
+            <span class="badge">{tag}</span>
+          ))}
+        </div>
+      )}
+      <div class="meta-pills">
+        <span class="meta-pill"><strong>Nivel</strong>{skill.level}</span>
+        <span class="meta-pill"><strong>Estado</strong>{skill.status}</span>
+        <span class="meta-pill"><strong>Version</strong>{skill.version}</span>
+        {typeof skill.estimatedTime === 'number' && (
+          <span class="meta-pill"><strong>Tiempo</strong>{skill.estimatedTime} min</span>
+        )}
+        {skill.frameworks.length > 0 && (
+          <span class="meta-pill"><strong>Frameworks</strong>{skill.frameworks.join(', ')}</span>
+        )}
+        {skill.testTypes.length > 0 && (
+          <span class="meta-pill"><strong>Tests</strong>{skill.testTypes.join(', ')}</span>
+        )}
       </div>
     </div>
-    <aside class="summary-card">
-      <p><strong>Nivel:</strong> {skill.level}</p>
-      <p><strong>Estado:</strong> {skill.status}</p>
-      <p><strong>Version:</strong> {skill.version}</p>
-      {typeof skill.estimatedTime === 'number' && <p><strong>Tiempo estimado:</strong> {skill.estimatedTime} min</p>}
-      {skill.frameworks.length > 0 && (
-        <p><strong>Frameworks:</strong> {skill.frameworks.join(', ')}</p>
-      )}
-      {skill.testTypes.length > 0 && (
-        <p><strong>Tipos de test:</strong> {skill.testTypes.join(', ')}</p>
-      )}
-      <div class="asset-wrap">
-        {skill.hasExamples && <span class="asset">Examples</span>}
-        {skill.hasTemplates && <span class="asset">Templates</span>}
-        {skill.hasEvals && <span class="asset">Evals</span>}
-        {skill.hasScripts && <span class="asset">Scripts</span>}
-      </div>
-      {skill.recommendedCommands.length > 0 && (
-        <div class="cmd-wrap">
-          <strong>Comandos sugeridos</strong>
-          <ul>
-            {skill.recommendedCommands.map((command) => (
-              <li><code>{command}</code></li>
-            ))}
-          </ul>
+    <aside class="skill-hero-panel">
+      {(skill.hasExamples || skill.hasTemplates || skill.hasEvals || skill.hasScripts) && (
+        <div class="asset-wrap">
+          {skill.hasExamples && <span class="asset">Examples</span>}
+          {skill.hasTemplates && <span class="asset">Templates</span>}
+          {skill.hasEvals && <span class="asset">Evals</span>}
+          {skill.hasScripts && <span class="asset">Scripts</span>}
         </div>
       )}
       {installSingleSkillCommand && (
@@ -156,21 +154,31 @@ const skillFileWebUrl = repoContext
           </div>
         </div>
       )}
-      <div class="telemetry-panel">
-        <strong>¿Te sirvió esta skill?</strong>
-        <div class="vote-row" id="helpful-vote-actions">
-          <button type="button" class="vote-button" data-vote="helpful">Sí</button>
-          <button type="button" class="vote-button" data-vote="not-helpful">No</button>
-        </div>
-        <p class="telemetry-meta" id="skill-view-meta">Sin vistas registradas todavía.</p>
-        <p class="telemetry-meta" id="skill-vote-meta">Aún no hay votos.</p>
-      </div>
+      {skill.recommendedCommands.length > 0 && (
+        <details class="cmd-wrap cmd-details">
+          <summary>Comandos sugeridos</summary>
+          <ul>
+            {skill.recommendedCommands.map((command) => (
+              <li><code>{command}</code></li>
+            ))}
+          </ul>
+        </details>
+      )}
     </aside>
-  </div>
+  </section>
   <section class="skill-doc-head">
     <p class="badge">Contenido de skill</p>
     <h2>{skillReadmeSourceLabel}</h2>
     <p>Se muestra {skillReadmeSourceLabel === 'README.md' ? 'README.md' : 'SKILL.md'} del repositorio.</p>
+  </section>
+  <section class="telemetry-panel">
+    <strong>¿Te sirvió esta skill?</strong>
+    <div class="vote-row" id="helpful-vote-actions">
+      <button type="button" class="vote-button" data-vote="helpful">Sí</button>
+      <button type="button" class="vote-button" data-vote="not-helpful">No</button>
+    </div>
+    <p class="telemetry-meta" id="skill-view-meta">Sin vistas registradas todavía.</p>
+    <p class="telemetry-meta" id="skill-vote-meta">Aún no hay votos.</p>
   </section>
   <div class="skill-content" set:html={skillDocHtml}></div>
   <section class="recommend-section">
@@ -184,41 +192,77 @@ const skillFileWebUrl = repoContext
   </section>
 
   <style>
-    .page-title {
+    .skill-hero {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 1rem;
-      padding: 1.5rem;
+      gap: 0.95rem;
+      padding: 1.1rem;
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 16px;
-      background: radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.12), transparent 40%),
-        radial-gradient(circle at 85% 0%, rgba(168, 85, 247, 0.12), transparent 38%),
+      background: radial-gradient(circle at 15% 18%, rgba(56, 189, 248, 0.12), transparent 43%),
+        radial-gradient(circle at 86% 2%, rgba(14, 116, 144, 0.18), transparent 36%),
         var(--panel);
       box-shadow: var(--shadow);
       margin-bottom: 1rem;
     }
-    .page-title h1 { margin: 0.3rem 0 0.4rem; letter-spacing: -0.01em; }
-    .page-title p { margin: 0; color: var(--muted); }
-    .page-title .badge {
+    .skill-hero-main {
+      min-width: 0;
+      display: grid;
+      gap: 0.45rem;
+    }
+    .skill-hero h1 {
+      margin: 0.1rem 0;
+      letter-spacing: -0.01em;
+      line-height: 1.05;
+    }
+    .skill-hero p {
+      margin: 0;
+      color: var(--muted);
+    }
+    .skill-hero .badge {
       margin: 0 0 0.4rem;
       background: rgba(148, 163, 184, 0.12);
       border: 1px solid rgba(255, 255, 255, 0.12);
       color: var(--text);
     }
-    .page-title .badge + .badge { margin-left: 0.3rem; }
+    .skill-hero .badge + .badge { margin-left: 0.3rem; }
     .tag-wrap { margin-top: 0.45rem; }
-    .summary-card {
-      min-width: 260px;
-      padding: 0.85rem;
+    .meta-pills {
+      margin-top: 0.15rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+    .meta-pill {
+      display: inline-flex;
+      gap: 0.4rem;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0.24rem 0.6rem;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(15, 23, 42, 0.45);
+      font-size: 0.82rem;
+      line-height: 1.2;
+      color: #dbeafe;
+      max-width: 100%;
+    }
+    .meta-pill strong {
+      color: #f8fafc;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .skill-hero-panel {
+      min-width: 280px;
+      max-width: 360px;
+      padding: 0.75rem;
       border-radius: 12px;
       border: 1px solid rgba(255, 255, 255, 0.1);
       background: rgba(2, 6, 23, 0.35);
       display: grid;
-      gap: 0.35rem;
+      gap: 0.55rem;
     }
-    .summary-card p { font-size: 0.92rem; }
-    .summary-card strong { color: #e2e8f0; }
     .asset-wrap {
       display: flex;
       flex-wrap: wrap;
@@ -232,7 +276,7 @@ const skillFileWebUrl = repoContext
       border: 1px solid rgba(255, 255, 255, 0.2);
       color: #dbeafe;
     }
-    .cmd-wrap { margin-top: 0.25rem; }
+    .cmd-wrap { margin-top: 0.1rem; }
     .cmd-wrap ul {
       margin: 0.4rem 0 0;
       padding-left: 1rem;
@@ -246,8 +290,31 @@ const skillFileWebUrl = repoContext
       border-radius: 6px;
       word-break: break-word;
     }
+    .cmd-details {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 0.5rem 0.6rem;
+      background: rgba(15, 23, 42, 0.45);
+    }
+    .cmd-details summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: #dbeafe;
+      font-size: 0.88rem;
+      list-style: none;
+    }
+    .cmd-details summary::-webkit-details-marker {
+      display: none;
+    }
+    .cmd-details summary::after {
+      content: ' +';
+      color: #93c5fd;
+    }
+    .cmd-details[open] summary::after {
+      content: ' -';
+    }
     .cmd-install-wrap {
-      margin-top: 0.55rem;
+      margin-top: 0;
       padding: 0.55rem;
       border-radius: 10px;
       border: 1px solid rgba(59, 130, 246, 0.35);
@@ -307,6 +374,16 @@ const skillFileWebUrl = repoContext
       border-radius: 999px;
       padding: 0.2rem 0.55rem;
     }
+    .telemetry-panel {
+      margin-top: 0.8rem;
+      margin-bottom: 0.75rem;
+      padding: 0.8rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(2, 6, 23, 0.34);
+      display: grid;
+      gap: 0.42rem;
+    }
     .skill-doc-head {
       margin-top: 1.1rem;
       display: grid;
@@ -318,13 +395,6 @@ const skillFileWebUrl = repoContext
     .skill-doc-head p {
       margin: 0;
       color: #94a3b8;
-    }
-    .telemetry-panel {
-      margin-top: 0.4rem;
-      padding-top: 0.6rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-      display: grid;
-      gap: 0.45rem;
     }
     .vote-row {
       display: flex;
@@ -392,8 +462,15 @@ const skillFileWebUrl = repoContext
       color: #94a3b8;
     }
     @media (max-width: 900px) {
-      .page-title { flex-direction: column; }
-      .summary-card { width: 100%; }
+      .skill-hero { flex-direction: column; }
+      .skill-hero-panel {
+        width: 100%;
+        max-width: none;
+      }
+      .meta-pill {
+        width: 100%;
+        justify-content: space-between;
+      }
       .install-command-box {
         grid-template-columns: 1fr;
       }
