@@ -22,7 +22,7 @@ Ejemplo de `.env`:
 ```bash
 GITHUB_TOKEN=github_pat_xxx
 GITHUB_API_BASE_URL=https://api.github.com
-GITHUB_API_VERSION=2026-03-10
+GITHUB_API_VERSION=2026-04-15
 GITHUB_REPO_OWNER=atdetquizan
 ```
 
