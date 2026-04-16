@@ -22,12 +22,16 @@ export interface SkillDoc {
   tags: string[];
   /** Id del repositorio origen. */
   repoId: string;
+  /** Nombre técnico de la skill (frontmatter.name o fallback de carpeta). */
+  name: string;
   /** Nombre del repositorio origen. */
   repoName: string;
   /** Ruta interna del portal para el detalle del skill. */
   url: string;
   /** Contenido markdown original del SKILL.md. */
   content: string;
+  /** Ruta relativa del archivo SKILL.md dentro del repositorio origen. */
+  sourcePath: string;
   /** Frameworks principales de la skill para filtros. */
   frameworks: string[];
   /** Tipos de prueba soportados por la skill. */
@@ -356,6 +360,7 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
     // Create temporary skill object for badge/score calculation
     const tempSkill = {
       id: skillId,
+      name: baseValue,
       title: String(frontmatter.title || baseValue),
       description: String(frontmatter.description || 'Descripcion pendiente'),
       tags: (frontmatter.tags as string[]) || [],
@@ -363,6 +368,7 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
       repoName: repo.name,
       url: `/skills/${skillId}/`,
       content: parsed.content,
+      sourcePath: filePath,
       frameworks,
       testTypes,
       level,

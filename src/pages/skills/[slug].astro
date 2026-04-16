@@ -1,9 +1,11 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import path from 'node:path';
 import { readReposConfig } from '../../lib/config';
-import { requireToken } from '../../lib/github.service';
+import { fetchRepositoryContent, fetchRepositoryFileText, requireToken } from '../../lib/github.service';
 import { collectAllSkills, fetchSkillBySlug } from '../../lib/skill.service';
 import { mdToHtml } from '../../lib/markdown';
+import { getRepoContext } from '../../lib/repo.service';
 
 export async function getStaticPaths() {
   requireToken();
@@ -25,7 +27,6 @@ if (!skill) {
   return Astro.redirect('/skills');
 }
 
-const html = mdToHtml(skill.content);
 const recommendationCatalog = allSkills.map((entry) => ({
   id: entry.id,
   title: entry.title,
@@ -37,6 +38,53 @@ const recommendationCatalog = allSkills.map((entry) => ({
   tags: entry.tags,
   score: entry.score
 }));
+
+const sourceRepo = repos.find((repo) => repo.id === skill.repoId) || null;
+const repoContext = sourceRepo ? await getRepoContext(sourceRepo) : null;
+
+const installSingleSkillCommand = sourceRepo
+  ? `private-skills add ${sourceRepo.repoUrl} --skill-name ${skill.name}`
+  : null;
+
+const repoWebUrl = repoContext
+  ? `https://github.com/${repoContext.slug.owner}/${repoContext.slug.name}`
+  : null;
+
+let skillReadmeOrSkillContent = skill.content;
+let skillReadmeOrSkillPath = skill.sourcePath;
+let skillReadmeSourceLabel = 'SKILL.md';
+
+if (repoContext) {
+  const branch = repoContext.defaultBranch;
+  const skillDir = path.posix.dirname(skill.sourcePath);
+  const dirContent = await fetchRepositoryContent(repoContext.slug.owner, repoContext.slug.name, skillDir, branch);
+
+  if (Array.isArray(dirContent)) {
+    const readmeEntry = dirContent.find(
+      (entry) => entry.type === 'file' && entry.name.toLowerCase() === 'readme.md'
+    );
+
+    if (readmeEntry) {
+      const readmeContent = await fetchRepositoryFileText(
+        repoContext.slug.owner,
+        repoContext.slug.name,
+        readmeEntry.path,
+        branch
+      );
+
+      if (readmeContent) {
+        skillReadmeOrSkillContent = readmeContent;
+        skillReadmeOrSkillPath = readmeEntry.path;
+        skillReadmeSourceLabel = 'README.md';
+      }
+    }
+  }
+}
+
+const skillDocHtml = mdToHtml(skillReadmeOrSkillContent);
+const skillFileWebUrl = repoContext
+  ? `${repoWebUrl}/blob/${repoContext.defaultBranch}/${skillReadmeOrSkillPath}`
+  : null;
 ---
 <Layout title={skill.title} description={skill.description}>
   <div class="page-title">
@@ -77,6 +125,27 @@ const recommendationCatalog = allSkills.map((entry) => ({
           </ul>
         </div>
       )}
+      {installSingleSkillCommand && (
+        <div class="cmd-wrap">
+          <strong>Instalar solo esta skill</strong>
+          <ul>
+            <li><code>{installSingleSkillCommand}</code></li>
+          </ul>
+        </div>
+      )}
+      {(repoWebUrl || skillFileWebUrl) && (
+        <div class="link-wrap">
+          <strong>Repositorio</strong>
+          <div class="repo-links">
+            {repoWebUrl && (
+              <a href={repoWebUrl} target="_blank" rel="noreferrer noopener">Ver repositorio</a>
+            )}
+            {skillFileWebUrl && (
+              <a href={skillFileWebUrl} target="_blank" rel="noreferrer noopener">Ver {skillReadmeSourceLabel}</a>
+            )}
+          </div>
+        </div>
+      )}
       <div class="telemetry-panel">
         <strong>¿Te sirvió esta skill?</strong>
         <div class="vote-row" id="helpful-vote-actions">
@@ -88,7 +157,12 @@ const recommendationCatalog = allSkills.map((entry) => ({
       </div>
     </aside>
   </div>
-  <div class="skill-content" set:html={html}></div>
+  <section class="skill-doc-head">
+    <p class="badge">Contenido de skill</p>
+    <h2>{skillReadmeSourceLabel}</h2>
+    <p>Se muestra {skillReadmeSourceLabel === 'README.md' ? 'README.md' : 'SKILL.md'} del repositorio.</p>
+  </section>
+  <div class="skill-content" set:html={skillDocHtml}></div>
   <section class="recommend-section">
     <div class="recommend-head">
       <p class="badge">Personalización ligera</p>
@@ -160,6 +234,35 @@ const recommendationCatalog = allSkills.map((entry) => ({
       border: 1px solid rgba(255, 255, 255, 0.14);
       padding: 0.05rem 0.35rem;
       border-radius: 6px;
+      word-break: break-word;
+    }
+    .link-wrap {
+      margin-top: 0.4rem;
+      display: grid;
+      gap: 0.3rem;
+    }
+    .repo-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .repo-links a {
+      color: #93c5fd;
+      text-decoration: none;
+      font-size: 0.88rem;
+      border-bottom: 1px dashed rgba(147, 197, 253, 0.6);
+    }
+    .skill-doc-head {
+      margin-top: 1.1rem;
+      display: grid;
+      gap: 0.2rem;
+    }
+    .skill-doc-head h2 {
+      margin: 0;
+    }
+    .skill-doc-head p {
+      margin: 0;
+      color: #94a3b8;
     }
     .telemetry-panel {
       margin-top: 0.4rem;
@@ -237,7 +340,7 @@ const recommendationCatalog = allSkills.map((entry) => ({
       .page-title { flex-direction: column; }
       .summary-card { width: 100%; }
     }
-    .skill-content { margin-top: 1.25rem; }
+    .skill-content { margin-top: 0.75rem; }
   </style>
 
   <script>
