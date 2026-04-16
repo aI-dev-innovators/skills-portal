@@ -160,84 +160,95 @@ const frameworkDistribution = frameworkOptions
 
   <section class="results-head">
     <h2>Resultados</h2>
-    <p id="results-count">{totalSkills} skills visibles</p>
+    <div class="results-actions">
+      <p id="results-count">{totalSkills} skills visibles</p>
+      <a class="excel-export" href="/api/skills-export/" download>Descargar Excel consolidado</a>
+    </div>
   </section>
 
   <section>
     {skills.length === 0 ? (
       <p class="hint">No hay skills registradas.</p>
     ) : (
-      <div class="skills-grid" id="skills-grid">
-        {skills.map((skill) => (
-          <article
-            class="skill-card"
-            data-title={skill.title.toLowerCase()}
-            data-desc={skill.description.toLowerCase()}
-            data-tags={(skill.tags || []).join(' ').toLowerCase()}
-            data-frameworks={(skill.frameworks || []).join(' ').toLowerCase()}
-            data-level={(skill.level || '').toLowerCase()}
-            data-test-types={(skill.testTypes || []).join(' ').toLowerCase()}
-            data-status={(skill.status || '').toLowerCase()}
-            data-repo={(skill.repoName || skill.repoId || '').toLowerCase()}
-            data-has-examples={skill.hasExamples ? 'true' : 'false'}
-          >
-            <header>
-              <p class="repo">{skill.repoName || skill.repoId}</p>
-              <h3><a href={`/skills/${skill.id}/`}>{skill.title}</a></h3>
-              <p class="desc">{skill.description}</p>
-            </header>
+      <>
+        <div class="skills-grid" id="skills-grid">
+          {skills.map((skill) => (
+            <article
+              class="skill-card"
+              data-title={skill.title.toLowerCase()}
+              data-desc={skill.description.toLowerCase()}
+              data-tags={(skill.tags || []).join(' ').toLowerCase()}
+              data-frameworks={(skill.frameworks || []).join(' ').toLowerCase()}
+              data-level={(skill.level || '').toLowerCase()}
+              data-test-types={(skill.testTypes || []).join(' ').toLowerCase()}
+              data-status={(skill.status || '').toLowerCase()}
+              data-repo={(skill.repoName || skill.repoId || '').toLowerCase()}
+              data-has-examples={skill.hasExamples ? 'true' : 'false'}
+            >
+              <header>
+                <p class="repo">{skill.repoName || skill.repoId}</p>
+                <h3><a href={`/skills/${skill.id}/`}>{skill.title}</a></h3>
+                <p class="desc">{skill.description}</p>
+              </header>
 
-            <div class="meta-row">
-              <span class="meta-chip">{skill.level}</span>
-              <span class="meta-chip">{skill.status}</span>
-              {typeof skill.estimatedTime === 'number' && <span class="meta-chip">{skill.estimatedTime} min</span>}
-              <span class="meta-chip">v{skill.version}</span>
-            </div>
-
-            <div class="taxonomy-row">
-              {(skill.frameworks || []).map((framework) => (
-                <span class="tag framework">{framework}</span>
-              ))}
-              {(skill.testTypes || []).map((testType) => (
-                <span class="tag type">{testType}</span>
-              ))}
-            </div>
-
-            {(skill.badges || []).length > 0 && (
-              <div class="badge-row">
-                {(skill.badges || []).map((badgeType) => {
-                  const badgeDef = getBadgeDefinition(badgeType);
-                  const colorMap = {
-                    'green': '#10b981',
-                    'blue': '#3b82f6',
-                    'purple': '#a855f7',
-                    'amber': '#f59e0b',
-                    'pink': '#ec4899'
-                  };
-                  const badgeColor = colorMap[badgeDef.color as keyof typeof colorMap];
-                  return (
-                    <span 
-                      class="auto-badge"
-                      title={badgeDef.tooltip}
-                      style={`background: ${badgeColor}20; border-color: ${badgeColor}50; color: ${badgeColor}`}
-                    >
-                      {badgeDef.icon} {badgeDef.label}
-                    </span>
-                  );
-                })}
+              <div class="meta-row">
+                <span class="meta-chip">{skill.level}</span>
+                <span class="meta-chip">{skill.status}</span>
+                {typeof skill.estimatedTime === 'number' && <span class="meta-chip">{skill.estimatedTime} min</span>}
+                <span class="meta-chip">v{skill.version}</span>
               </div>
-            )}
 
-            <div class="asset-row">
-              {skill.hasExamples && <span class="badge">Examples</span>}
-              {skill.hasTemplates && <span class="badge">Templates</span>}
-              {skill.hasEvals && <span class="badge">Evals</span>}
-              {skill.hasScripts && <span class="badge">Scripts</span>}
-              {skill.status === 'recommended' && <span class="badge featured">Recommended</span>}
-            </div>
-          </article>
-        ))}
-      </div>
+              <div class="taxonomy-row">
+                {(skill.frameworks || []).map((framework) => (
+                  <span class="tag framework">{framework}</span>
+                ))}
+                {(skill.testTypes || []).map((testType) => (
+                  <span class="tag type">{testType}</span>
+                ))}
+              </div>
+
+              {(skill.badges || []).length > 0 && (
+                <div class="badge-row">
+                  {(skill.badges || []).map((badgeType) => {
+                    const badgeDef = getBadgeDefinition(badgeType);
+                    const colorMap = {
+                      'green': '#10b981',
+                      'blue': '#3b82f6',
+                      'purple': '#a855f7',
+                      'amber': '#f59e0b',
+                      'pink': '#ec4899'
+                    };
+                    const badgeColor = colorMap[badgeDef.color as keyof typeof colorMap];
+                    return (
+                      <span
+                        class="auto-badge"
+                        title={badgeDef.tooltip}
+                        style={`background: ${badgeColor}20; border-color: ${badgeColor}50; color: ${badgeColor}`}
+                      >
+                        {badgeDef.icon} {badgeDef.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div class="asset-row">
+                {skill.hasExamples && <span class="badge">Examples</span>}
+                {skill.hasTemplates && <span class="badge">Templates</span>}
+                {skill.hasEvals && <span class="badge">Evals</span>}
+                {skill.hasScripts && <span class="badge">Scripts</span>}
+                {skill.status === 'recommended' && <span class="badge featured">Recommended</span>}
+              </div>
+            </article>
+          ))}
+        </div>
+
+        <nav class="pagination" id="skills-pagination" aria-label="Paginacion del listado de skills">
+          <button type="button" id="pagination-prev" onclick="goToPreviousPage()">Anterior</button>
+          <p id="pagination-status">Pagina 1 de 1</p>
+          <button type="button" id="pagination-next" onclick="goToNextPage()">Siguiente</button>
+        </nav>
+      </>
     )}
   </section>
 
@@ -552,11 +563,70 @@ const frameworkDistribution = frameworkOptions
       font-size: 0.9rem;
     }
 
+    .results-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .excel-export {
+      border: 1px solid rgba(125, 211, 252, 0.35);
+      background: rgba(14, 116, 144, 0.15);
+      color: #bae6fd;
+      border-radius: 10px;
+      padding: 0.52rem 0.7rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+    }
+
+    .excel-export:hover {
+      background: rgba(14, 116, 144, 0.26);
+      border-color: rgba(125, 211, 252, 0.55);
+      color: #e0f2fe;
+    }
+
     .skills-grid {
       margin-top: 0.85rem;
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 0.75rem;
+    }
+
+    .pagination {
+      margin-top: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .pagination p {
+      margin: 0;
+      color: #94a3b8;
+      font-size: 0.86rem;
+      min-width: 140px;
+      text-align: center;
+    }
+
+    .pagination button {
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(148, 163, 184, 0.12);
+      color: #e2e8f0;
+      border-radius: 9px;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .pagination button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
     }
 
     .skill-card {
@@ -706,6 +776,9 @@ const frameworkDistribution = frameworkOptions
         width: 100%;
         justify-self: stretch;
       }
+      .skills-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
     }
 
     @media (max-width: 760px) {
@@ -714,6 +787,9 @@ const frameworkDistribution = frameworkOptions
       }
       .toggle-row {
         grid-template-columns: 1fr;
+      }
+      .skills-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
@@ -730,12 +806,29 @@ const frameworkDistribution = frameworkOptions
       .kpi-strip {
         grid-template-columns: 1fr;
       }
+      .skills-grid {
+        grid-template-columns: 1fr;
+      }
+      .results-head {
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+      .pagination {
+        justify-content: center;
+      }
     }
   </style>
 
   <script>
     const grid = document.getElementById('skills-grid');
     const resultsCount = document.getElementById('results-count');
+    const paginationStatus = document.getElementById('pagination-status');
+    const paginationPrev = document.getElementById('pagination-prev');
+    const paginationNext = document.getElementById('pagination-next');
+
+    const PAGE_SIZE = 12;
+    let currentPage = 1;
+    let filteredCards: HTMLElement[] = [];
 
     function tokenize(value: string): string {
       return (value || '').toLowerCase().trim();
@@ -801,20 +894,53 @@ const frameworkDistribution = frameworkOptions
       const recommendedOnly = getValue('skill-recommended-only') === 'true';
 
       const cards = Array.from(grid.children) as HTMLElement[];
-      let visibleCount = 0;
+
+      filteredCards = cards.filter((card) =>
+        matchesFacet(card, query, repo, framework, level, testType, status, examplesOnly, recommendedOnly)
+      );
+      currentPage = 1;
+      renderPage();
+    }
+
+    function renderPage() {
+      if (!grid) return;
+
+      const cards = Array.from(grid.children) as HTMLElement[];
+      const totalPages = Math.max(Math.ceil(filteredCards.length / PAGE_SIZE), 1);
+
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const end = start + PAGE_SIZE;
+      const visibleCards = new Set(filteredCards.slice(start, end));
 
       cards.forEach((card) => {
-        const asElement = card;
-        const visible = matchesFacet(asElement, query, repo, framework, level, testType, status, examplesOnly, recommendedOnly);
-        if (asElement instanceof HTMLElement) {
-          asElement.style.display = visible ? 'grid' : 'none';
-        }
-        if (visible) visibleCount += 1;
+        card.style.display = visibleCards.has(card) ? 'grid' : 'none';
       });
 
       if (resultsCount) {
-        resultsCount.textContent = `${visibleCount} skills visibles`;
+        resultsCount.textContent = `${filteredCards.length} skills visibles`;
       }
+      if (paginationStatus) {
+        paginationStatus.textContent = `Pagina ${currentPage} de ${totalPages}`;
+      }
+      if (paginationPrev instanceof HTMLButtonElement) {
+        paginationPrev.disabled = currentPage <= 1;
+      }
+      if (paginationNext instanceof HTMLButtonElement) {
+        paginationNext.disabled = currentPage >= totalPages;
+      }
+    }
+
+    function goToPreviousPage() {
+      currentPage -= 1;
+      renderPage();
+    }
+
+    function goToNextPage() {
+      currentPage += 1;
+      renderPage();
     }
 
     function resetSkillFilters() {
@@ -839,9 +965,15 @@ const frameworkDistribution = frameworkOptions
       filterSkills();
     }
 
+    filterSkills();
+
     // @ts-ignore
     window.filterSkills = filterSkills;
     // @ts-ignore
     window.resetSkillFilters = resetSkillFilters;
+    // @ts-ignore
+    window.goToPreviousPage = goToPreviousPage;
+    // @ts-ignore
+    window.goToNextPage = goToNextPage;
   </script>
 </Layout>

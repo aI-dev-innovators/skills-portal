@@ -39,6 +39,13 @@ URLs útiles en local:
 - Skills: <http://localhost:4321/skills>
 - Repos: <http://localhost:4321/repos>
 
+## Features en Skills
+
+- Listado en grilla con 4 columnas en desktop (adaptativo en tablet/móvil).
+- Filtros facetados en cliente (repositorio, framework, nivel, tipo de test, estado, búsqueda y toggles).
+- Paginación de resultados aplicada sobre el conjunto filtrado para mantener navegación estable.
+- Exportación consolidada a Excel desde `/skills` con descarga vía endpoint `GET /api/skills-export/`.
+
 ## Comportamiento de datos
 
 - Build: páginas `/skills`, `/skills/:slug`, `/repos`, `/repos/:id` consumen la GitHub API con `Authorization: Bearer <token>` al compilar.

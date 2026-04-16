@@ -55,11 +55,12 @@ const { title = 'Skills Portal', description = 'Portal interno de skills' } = As
 
         const href = anchor.getAttribute('href') || '';
         const newTab = anchor.getAttribute('target') === '_blank';
+        const isDownload = anchor.hasAttribute('download');
         const isAnchor = href.startsWith('#');
         const isMail = href.startsWith('mailto:');
         const isTel = href.startsWith('tel:');
 
-        if (newTab || isAnchor || isMail || isTel) return;
+        if (newTab || isDownload || isAnchor || isMail || isTel) return;
         trackLinkClick(href);
         showLoader();
       });
