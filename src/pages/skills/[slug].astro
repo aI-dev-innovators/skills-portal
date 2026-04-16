@@ -126,11 +126,21 @@ const skillFileWebUrl = repoContext
         </div>
       )}
       {installSingleSkillCommand && (
-        <div class="cmd-wrap">
+        <div class="cmd-wrap cmd-install-wrap">
           <strong>Instalar solo esta skill</strong>
-          <ul>
-            <li><code>{installSingleSkillCommand}</code></li>
-          </ul>
+          <div class="install-command-box">
+            <code id="install-skill-command">{installSingleSkillCommand}</code>
+            <button
+              type="button"
+              class="copy-command-button"
+              id="copy-install-command"
+              data-command={installSingleSkillCommand}
+              aria-label="Copiar comando de instalación"
+            >
+              Copiar
+            </button>
+          </div>
+          <p class="copy-command-meta" id="copy-install-command-meta">Copia el comando y ejecútalo en tu terminal.</p>
         </div>
       )}
       {(repoWebUrl || skillFileWebUrl) && (
@@ -141,7 +151,7 @@ const skillFileWebUrl = repoContext
               <a href={repoWebUrl} target="_blank" rel="noreferrer noopener">Ver repositorio</a>
             )}
             {skillFileWebUrl && (
-              <a href={skillFileWebUrl} target="_blank" rel="noreferrer noopener">Ver {skillReadmeSourceLabel}</a>
+              <a href={skillFileWebUrl} target="_blank" rel="noreferrer noopener">Ver skill</a>
             )}
           </div>
         </div>
@@ -236,6 +246,49 @@ const skillFileWebUrl = repoContext
       border-radius: 6px;
       word-break: break-word;
     }
+    .cmd-install-wrap {
+      margin-top: 0.55rem;
+      padding: 0.55rem;
+      border-radius: 10px;
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      background: linear-gradient(120deg, rgba(2, 6, 23, 0.75), rgba(15, 23, 42, 0.65));
+    }
+    .install-command-box {
+      margin-top: 0.45rem;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.45rem;
+      align-items: start;
+    }
+    .install-command-box code {
+      line-height: 1.5;
+      padding: 0.35rem 0.5rem;
+    }
+    .copy-command-button {
+      border: 1px solid rgba(96, 165, 250, 0.55);
+      background: rgba(59, 130, 246, 0.18);
+      color: #dbeafe;
+      border-radius: 8px;
+      padding: 0.4rem 0.72rem;
+      font-size: 0.83rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 120ms ease, transform 120ms ease;
+    }
+    .copy-command-button:hover {
+      background: rgba(59, 130, 246, 0.28);
+      transform: translateY(-1px);
+    }
+    .copy-command-button.is-copied {
+      border-color: rgba(16, 185, 129, 0.65);
+      background: rgba(16, 185, 129, 0.22);
+      color: #bbf7d0;
+    }
+    .copy-command-meta {
+      margin: 0.45rem 0 0;
+      font-size: 0.79rem;
+      color: #93c5fd;
+    }
     .link-wrap {
       margin-top: 0.4rem;
       display: grid;
@@ -250,7 +303,9 @@ const skillFileWebUrl = repoContext
       color: #93c5fd;
       text-decoration: none;
       font-size: 0.88rem;
-      border-bottom: 1px dashed rgba(147, 197, 253, 0.6);
+      border: 1px solid rgba(147, 197, 253, 0.45);
+      border-radius: 999px;
+      padding: 0.2rem 0.55rem;
     }
     .skill-doc-head {
       margin-top: 1.1rem;
@@ -339,6 +394,12 @@ const skillFileWebUrl = repoContext
     @media (max-width: 900px) {
       .page-title { flex-direction: column; }
       .summary-card { width: 100%; }
+      .install-command-box {
+        grid-template-columns: 1fr;
+      }
+      .copy-command-button {
+        justify-self: start;
+      }
     }
     .skill-content { margin-top: 0.75rem; }
   </style>
@@ -358,6 +419,36 @@ const skillFileWebUrl = repoContext
     const viewMeta = document.getElementById('skill-view-meta');
     const voteMeta = document.getElementById('skill-vote-meta');
     const recommendationsContainer = document.getElementById('recommended-skills-detail');
+    const copyInstallButton = document.getElementById('copy-install-command');
+    const copyInstallMeta = document.getElementById('copy-install-command-meta');
+
+    async function copyInstallCommand(command: string) {
+      if (!command) return;
+      try {
+        await navigator.clipboard.writeText(command);
+        if (copyInstallButton instanceof HTMLButtonElement) {
+          copyInstallButton.classList.add('is-copied');
+          copyInstallButton.textContent = 'Copiado';
+        }
+        if (copyInstallMeta) {
+          copyInstallMeta.textContent = 'Comando copiado al portapapeles.';
+        }
+      } catch {
+        if (copyInstallMeta) {
+          copyInstallMeta.textContent = 'No se pudo copiar automáticamente. Copia el comando manualmente.';
+        }
+      } finally {
+        setTimeout(() => {
+          if (copyInstallButton instanceof HTMLButtonElement) {
+            copyInstallButton.classList.remove('is-copied');
+            copyInstallButton.textContent = 'Copiar';
+          }
+          if (copyInstallMeta) {
+            copyInstallMeta.textContent = 'Copia el comando y ejecútalo en tu terminal.';
+          }
+        }, 1800);
+      }
+    }
 
     function renderVoteState() {
       const stats = getHelpfulVoteStats(skillProfile.id);
@@ -389,6 +480,13 @@ const skillFileWebUrl = repoContext
       if (vote !== 'helpful' && vote !== 'not-helpful') return;
       trackHelpfulVote(skillProfile.id, vote);
       renderVoteState();
+    });
+
+    copyInstallButton?.addEventListener('click', () => {
+      const command = copyInstallButton instanceof HTMLButtonElement
+        ? copyInstallButton.dataset.command || ''
+        : '';
+      copyInstallCommand(command);
     });
 
     const recommended = getRecommendedSkills(recommendationCatalog, skillProfile.id, 4);
