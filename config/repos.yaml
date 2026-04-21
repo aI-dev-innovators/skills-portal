@@ -46,3 +46,35 @@ repos:
     readmePath: README.md
     skillsPath: skills
     tags: [documentation, writing]
+
+  - id: webcomponents-skills
+    name: WebComponents Skills
+    repoUrl: git@github.com:aI-dev-innovators/webcomponents-skills.git
+    defaultBranch: main
+    readmePath: README.md
+    skillsPath: skills
+    tags: [frontend, webcomponents]
+
+  - id: refactoring-skills
+    name: Refactoring Skills
+    repoUrl: git@github.com:aI-dev-innovators/refactoring-skills.git
+    defaultBranch: main
+    readmePath: README.md
+    skillsPath: skills
+    tags: [refactoring, code-quality]
+
+  - id: api-integration-skills
+    name: API Integration Skills
+    repoUrl: git@github.com:aI-dev-innovators/api-integration-skills.git
+    defaultBranch: main
+    readmePath: README.md
+    skillsPath: skills
+    tags: [api, integration]
+
+  - id: architecture-skills
+    name: Architecture Skills
+    repoUrl: git@github.com:aI-dev-innovators/architecture-skills.git
+    defaultBranch: main
+    readmePath: README.md
+    skillsPath: skills
+    tags: [architecture, design]
