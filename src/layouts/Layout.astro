@@ -29,6 +29,19 @@ function isActivePath(href: string): boolean {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <script is:inline>
+      (() => {
+        try {
+          const savedTheme = localStorage.getItem('skills-portal-theme');
+          const theme = savedTheme === 'dark' ? 'dark' : 'light';
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+        } catch {
+          document.documentElement.dataset.theme = 'light';
+          document.documentElement.style.colorScheme = 'light';
+        }
+      })();
+    </script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">Saltar al contenido</a>
@@ -46,15 +59,30 @@ function isActivePath(href: string): boolean {
             </a>
           ))}
         </nav>
-        {session && user ? (
-          <div class="auth-user" aria-label="Sesion activa">
-            {avatar ? <img src={avatar} alt="Avatar" class="auth-avatar" /> : <span class="auth-avatar auth-avatar-fallback">{displayName.slice(0, 1).toUpperCase()}</span>}
-            <span class="auth-name">{displayName}</span>
-            <button id="logout-button" class="auth-action" type="button">Salir</button>
-          </div>
-        ) : (
-          <a class="auth-action" href="/login/">Ingresar</a>
-        )}
+        <div class="header-tools">
+          <button
+            id="theme-toggle"
+            class="theme-toggle"
+            type="button"
+            role="switch"
+            aria-label="Cambiar tema"
+            aria-checked="false"
+          >
+            <span class="theme-toggle__track" aria-hidden="true">
+              <span class="theme-toggle__thumb"></span>
+            </span>
+            <span id="theme-toggle-label" class="theme-toggle__label">Claro</span>
+          </button>
+          {session && user ? (
+            <div class="auth-user" aria-label="Sesion activa">
+              {avatar ? <img src={avatar} alt="Avatar" class="auth-avatar" /> : <span class="auth-avatar auth-avatar-fallback">{displayName.slice(0, 1).toUpperCase()}</span>}
+              <span class="auth-name">{displayName}</span>
+              <button id="logout-button" class="auth-action" type="button">Salir</button>
+            </div>
+          ) : (
+            <a class="auth-action" href="/login/">Ingresar</a>
+          )}
+        </div>
       </div>
     </header>
     <main id="main-content" class="shell">
@@ -72,6 +100,7 @@ function isActivePath(href: string): boolean {
     <script>
       import { trackLinkClick } from '../lib/client-telemetry';
       const { signOut } = await import('../lib/auth-client');
+      const themeStorageKey = 'skills-portal-theme';
 
       // Preloader para transiciones de página y clics en navegación.
       const loader = document.getElementById('page-loader');
@@ -81,6 +110,48 @@ function isActivePath(href: string): boolean {
       window.addEventListener('pageshow', hideLoader);
       window.addEventListener('load', hideLoader);
       window.addEventListener('beforeunload', showLoader);
+
+      const root = document.documentElement;
+      const themeToggle = document.getElementById('theme-toggle');
+      const themeToggleLabel = document.getElementById('theme-toggle-label');
+
+      const updateThemeUi = (theme: string) => {
+        const isDark = theme === 'dark';
+        if (themeToggle) {
+          themeToggle.setAttribute('aria-checked', String(isDark));
+          themeToggle.setAttribute('aria-label', isDark ? 'Activar tema claro' : 'Activar tema oscuro');
+          themeToggle.classList.toggle('is-dark', isDark);
+        }
+        if (themeToggleLabel) themeToggleLabel.textContent = isDark ? 'Oscuro' : 'Claro';
+      };
+
+      const applyTheme = (theme: string) => {
+        const safeTheme = theme === 'dark' ? 'dark' : 'light';
+        root.dataset.theme = safeTheme;
+        root.style.colorScheme = safeTheme;
+        updateThemeUi(safeTheme);
+      };
+
+      const getInitialTheme = () => {
+        try {
+          const savedTheme = localStorage.getItem(themeStorageKey);
+          return savedTheme === 'dark' ? 'dark' : 'light';
+        } catch {
+          return 'light';
+        }
+      };
+
+      applyTheme(getInitialTheme());
+
+      themeToggle?.addEventListener('click', () => {
+        const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        applyTheme(nextTheme);
+        try {
+          localStorage.setItem(themeStorageKey, nextTheme);
+        } catch {
+          // Ignora storage bloqueado; mantiene preferencia en runtime.
+        }
+      });
 
       document.addEventListener('click', (event) => {
         const target = event.target as HTMLElement | null;
