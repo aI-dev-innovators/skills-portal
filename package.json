@@ -16,6 +16,7 @@
   "dependencies": {
     "@astrojs/check": "^0.9.8",
     "@astrojs/node": "^9.5.5",
+    "@astrojs/vercel": "^9.0.5",
     "@auth/core": "^0.37.4",
     "astro": "^5.17.0",
     "auth-astro": "^4.2.0",

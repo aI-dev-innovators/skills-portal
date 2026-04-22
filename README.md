@@ -86,6 +86,9 @@ URLs útiles en local:
 
 - Base de la app: `/` (configurada en `astro.config.mjs`).
 - Workflows: `.github/workflows/build.yml` valida build y `.github/workflows/deploy.yml` publica en Pages (usa `npm ci`, cache npm y requiere `GITHUB_TOKEN`).
+- En Vercel, el proyecto ahora usa el adapter oficial de Vercel automáticamente cuando detecta `VERCEL=true`.
+- Si aparece `404: NOT_FOUND` en Vercel, revisa que el deployment sea de este repo/rama y que no esté apuntando a un output estático antiguo.
+- Variables mínimas en Vercel: `GITHUB_TOKEN` (o `GITHUB_PAT`), `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `AUTH_SECRET`, `AUTH_TRUST_HOST=true`, `ALLOWED_EMAIL_DOMAINS`.
 
 ## Depuración
 
