@@ -2,6 +2,7 @@ node_modules/
 .cache/
 dist/
 .astro/
+.vercel/
 .env
 .env.local
 npm-debug.log*
