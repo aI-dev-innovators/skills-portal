@@ -37,11 +37,11 @@ const errorMessage =
   </section>
 
   <script>
-    import { signInWithGitHub } from '../lib/auth-client';
+    const { signIn } = await import('auth-astro/client');
     const button = document.getElementById('github-login');
 
     button?.addEventListener('click', async () => {
-      await signInWithGitHub();
+      await signIn('github');
     });
   </script>
 </Layout>
