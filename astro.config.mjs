@@ -4,6 +4,14 @@ import vercel from '@astrojs/vercel';
 import auth from 'auth-astro';
 
 const isVercel = process.env.VERCEL === '1' || process.env.VERCEL === 'true';
+const site =
+  process.env.AUTH_URL ||
+  process.env.NEXTAUTH_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : undefined) ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
+  'http://localhost:4321';
 
 export default defineConfig({
   output: 'server',
@@ -15,7 +23,7 @@ export default defineConfig({
   integrations: [auth()],
   trailingSlash: 'ignore',
   srcDir: 'src',
-  site: 'https://aI-dev-innovators.github.io',
+  site,
   markdown: {
     syntaxHighlight: 'shiki'
   },

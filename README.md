@@ -17,6 +17,8 @@ Portal de skills con Astro 5 en modo servidor: lee README y SKILL.md desde GitHu
 - `GITHUB_CLIENT_SECRET`: Client Secret de la GitHub OAuth App.
 - `ALLOWED_EMAIL_DOMAINS`: lista separada por comas de dominios permitidos para login (ej. `example.dominio.pe,dominio.pe`).
 - `AUTH_SECRET`: secreto para firmar sesión/cookies de Auth.js.
+- `AUTH_URL`: URL canónica pública de Auth.js (ej. `https://skills-portal-one.vercel.app`).
+  - Recomendado en Vercel para evitar que Auth resuelva `localhost` en cookies `callback-url`.
 - `AUTH_TRUST_HOST`: usar `true` detrás de proxy/plataformas gestionadas.
 - `GITHUB_API_BASE_URL`: base de la API REST de GitHub (default `https://api.github.com`).
 - `GITHUB_API_VERSION`: versión de API enviada en `X-GitHub-Api-Version` (default `2026-03-10`).
@@ -30,6 +32,7 @@ GITHUB_CLIENT_ID=Iv1.xxxxxxxxxx
 GITHUB_CLIENT_SECRET=xxxxxxxxxx
 ALLOWED_EMAIL_DOMAINS=example.dominio.pe,dominio.pe
 AUTH_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+AUTH_URL=https://skills-portal-one.vercel.app
 AUTH_TRUST_HOST=true
 GITHUB_API_BASE_URL=https://api.github.com
 GITHUB_API_VERSION=2026-04-15
@@ -88,7 +91,8 @@ URLs útiles en local:
 - Workflows: `.github/workflows/build.yml` valida build y `.github/workflows/deploy.yml` publica en Pages (usa `npm ci`, cache npm y requiere `GITHUB_TOKEN`).
 - En Vercel, el proyecto ahora usa el adapter oficial de Vercel automáticamente cuando detecta `VERCEL=true`.
 - Si aparece `404: NOT_FOUND` en Vercel, revisa que el deployment sea de este repo/rama y que no esté apuntando a un output estático antiguo.
-- Variables mínimas en Vercel: `GITHUB_TOKEN` (o `GITHUB_PAT`), `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `AUTH_SECRET`, `AUTH_TRUST_HOST=true`, `ALLOWED_EMAIL_DOMAINS`.
+- Variables mínimas en Vercel: `GITHUB_TOKEN` (o `GITHUB_PAT`), `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `AUTH_SECRET`, `AUTH_URL`, `AUTH_TRUST_HOST=true`, `ALLOWED_EMAIL_DOMAINS`.
+- Si aparece `Cross-site POST form submissions are forbidden`, revisa `AUTH_URL`/`NEXTAUTH_URL` por ambiente y confirma que ninguna variable apunte a `http://localhost`.
 
 ## Depuración
 
