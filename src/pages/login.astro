@@ -1,0 +1,47 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getSession } from 'auth-astro/server';
+
+const session = await getSession(Astro.request);
+const authError = Astro.url.searchParams.get('error');
+const allowedDomains = (import.meta.env.ALLOWED_EMAIL_DOMAINS || 'example.dominio.pe,dominio.pe')
+  .split(',')
+  .map((domain) => domain.trim().replace(/^@/, '').toLowerCase())
+  .filter(Boolean);
+const allowedDomainsLabel = allowedDomains.map((domain) => `@${domain}`).join(', ');
+
+if (session?.user) {
+  return Astro.redirect('/');
+}
+
+const errorMessage =
+  authError === 'AccessDenied'
+    ? `Tu cuenta de GitHub no pertenece a un dominio autorizado para esta plataforma. Dominios permitidos: ${allowedDomainsLabel}.`
+    : authError
+      ? 'No fue posible iniciar sesion. Intenta nuevamente o contacta al administrador.'
+      : '';
+---
+
+<Layout title="Iniciar sesion" description="Accede al portal con GitHub">
+  <section class="login-wrap">
+    <article class="login-card">
+      <p class="login-eyebrow">Autenticacion requerida</p>
+      <h1>Ingresa con GitHub</h1>
+      <p>
+        Esta plataforma requiere una cuenta de GitHub autorizada para acceder al contenido interno.
+      </p>
+      {errorMessage ? <p class="login-error" role="alert">{errorMessage}</p> : null}
+      <button id="github-login" class="login-btn" type="button">Continuar con GitHub</button>
+      <p class="login-help">Solo se permite acceso con correos de: <strong>{allowedDomainsLabel}</strong></p>
+    </article>
+  </section>
+
+  <script>
+    import { signInWithGitHub } from '../lib/auth-client';
+    const button = document.getElementById('github-login');
+
+    button?.addEventListener('click', async () => {
+      await signInWithGitHub();
+    });
+  </script>
+</Layout>

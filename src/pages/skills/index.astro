@@ -161,7 +161,7 @@ const frameworkDistribution = frameworkOptions
   <section class="results-head">
     <h2>Resultados</h2>
     <div class="results-actions">
-      <p id="results-count">{totalSkills} skills visibles</p>
+      <p id="results-count" aria-live="polite">{totalSkills} skills visibles</p>
       <a class="excel-export" href="/api/skills-export/" download>Descargar Excel consolidado</a>
     </div>
   </section>
@@ -242,6 +242,9 @@ const frameworkDistribution = frameworkOptions
             </article>
           ))}
         </div>
+        <p id="skills-empty-state" class="empty-results" hidden>
+          No hay skills que coincidan con los filtros actuales.
+        </p>
 
         <nav class="pagination" id="skills-pagination" aria-label="Paginacion del listado de skills">
           <button type="button" id="pagination-prev" onclick="goToPreviousPage()">Anterior</button>
@@ -253,42 +256,26 @@ const frameworkDistribution = frameworkOptions
   </section>
 
   <style>
-    :global(body) {
-      background: #07090f;
-      color: #e5e7eb;
-      font-family: "Space Grotesk", "Public Sans", system-ui, -apple-system, sans-serif;
-    }
-
-    :global(.site-header), :global(.site-footer) {
-      background: #0c101a;
-      border-color: rgba(255, 255, 255, 0.06);
-    }
-
-    :global(.site-header .brand) { color: #e5e7eb; }
-    :global(.site-header nav a) { color: #cbd5e1; }
-    :global(.site-header nav a:hover) { color: #e0f2fe; }
-    :global(main) { padding: 2rem 0 3rem; }
-
     .hero {
       display: grid;
       grid-template-columns: 1.85fr minmax(280px, 340px);
       gap: 1.5rem;
       align-items: start;
       padding: 2rem;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border);
       border-radius: 18px;
       background:
-        radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.12), transparent 35%),
-        radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.16), transparent 32%),
-        #0c101a;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+        radial-gradient(circle at 20% 20%, rgba(61, 217, 196, 0.18), transparent 35%),
+        radial-gradient(circle at 80% 0%, rgba(255, 180, 84, 0.14), transparent 32%),
+        var(--panel);
+      box-shadow: var(--shadow-soft);
     }
 
     .eyebrow {
       text-transform: uppercase;
       letter-spacing: 0.12em;
       font-size: 0.8rem;
-      color: #a5b4fc;
+      color: #8cd8cd;
       margin: 0 0 0.4rem;
     }
 
@@ -299,7 +286,7 @@ const frameworkDistribution = frameworkOptions
     }
 
     .lede {
-      color: #cbd5e1;
+      color: var(--muted);
       margin: 0.6rem 0 1.2rem;
       max-width: 720px;
       line-height: 1.5;
@@ -319,8 +306,8 @@ const frameworkDistribution = frameworkOptions
     }
 
     .insight-card {
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel-elevated) 74%, transparent);
       border-radius: 12px;
       padding: 0.75rem 0.85rem;
       display: grid;
@@ -332,7 +319,7 @@ const frameworkDistribution = frameworkOptions
       font-size: 0.8rem;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: #a5b4fc;
+      color: #8cd8cd;
       font-weight: 700;
     }
 
@@ -629,6 +616,16 @@ const frameworkDistribution = frameworkOptions
       cursor: not-allowed;
     }
 
+    .empty-results {
+      margin: 0.9rem 0 0;
+      padding: 0.8rem 0.95rem;
+      border-radius: 10px;
+      border: 1px dashed var(--border-strong);
+      background: color-mix(in srgb, var(--panel) 82%, transparent);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
     .skill-card {
       display: grid;
       gap: 0.6rem;
@@ -825,6 +822,8 @@ const frameworkDistribution = frameworkOptions
     const paginationStatus = document.getElementById('pagination-status');
     const paginationPrev = document.getElementById('pagination-prev');
     const paginationNext = document.getElementById('pagination-next');
+    const paginationNav = document.getElementById('skills-pagination');
+    const emptyState = document.getElementById('skills-empty-state');
 
     const PAGE_SIZE = 12;
     let currentPage = 1;
@@ -906,6 +905,40 @@ const frameworkDistribution = frameworkOptions
       if (!grid) return;
 
       const cards = Array.from(grid.children) as HTMLElement[];
+      const hasResults = filteredCards.length > 0;
+
+      if (!hasResults) {
+        cards.forEach((card) => {
+          card.style.display = 'none';
+        });
+        if (resultsCount) {
+          resultsCount.textContent = '0 skills visibles';
+        }
+        if (paginationStatus) {
+          paginationStatus.textContent = 'Sin resultados';
+        }
+        if (paginationPrev instanceof HTMLButtonElement) {
+          paginationPrev.disabled = true;
+        }
+        if (paginationNext instanceof HTMLButtonElement) {
+          paginationNext.disabled = true;
+        }
+        if (paginationNav) {
+          paginationNav.setAttribute('hidden', 'hidden');
+        }
+        if (emptyState) {
+          emptyState.removeAttribute('hidden');
+        }
+        return;
+      }
+
+      if (paginationNav) {
+        paginationNav.removeAttribute('hidden');
+      }
+      if (emptyState) {
+        emptyState.setAttribute('hidden', 'hidden');
+      }
+
       const totalPages = Math.max(Math.ceil(filteredCards.length / PAGE_SIZE), 1);
 
       if (currentPage > totalPages) currentPage = totalPages;

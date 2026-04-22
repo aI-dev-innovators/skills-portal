@@ -1,6 +1,6 @@
 # skills-portal
 
-Portal de skills con Astro 5 (build estático): lee README y SKILL.md desde GitHub al compilar o servir, usando un token de solo lectura. Incluye caché en memoria y concurrencia limitada para responder rápido.
+Portal de skills con Astro 5 en modo servidor: lee README y SKILL.md desde GitHub con token de solo lectura e integra autenticación con GitHub OAuth para acceso a la plataforma.
 
 ## Requisitos rápidos
 
@@ -13,6 +13,11 @@ Portal de skills con Astro 5 (build estático): lee README y SKILL.md desde GitH
 - `GITHUB_TOKEN` o `GITHUB_PAT`: token de lectura usado en build y runtime para pedir README/SKILL.md.
   - Token fine-grained: Permissions → Contents: Read y Metadata: Read sobre los repos necesarios.
   - Token clásico: scope `repo` de lectura.
+- `GITHUB_CLIENT_ID`: Client ID de la GitHub OAuth App.
+- `GITHUB_CLIENT_SECRET`: Client Secret de la GitHub OAuth App.
+- `ALLOWED_EMAIL_DOMAINS`: lista separada por comas de dominios permitidos para login (ej. `example.dominio.pe,dominio.pe`).
+- `AUTH_SECRET`: secreto para firmar sesión/cookies de Auth.js.
+- `AUTH_TRUST_HOST`: usar `true` detrás de proxy/plataformas gestionadas.
 - `GITHUB_API_BASE_URL`: base de la API REST de GitHub (default `https://api.github.com`).
 - `GITHUB_API_VERSION`: versión de API enviada en `X-GitHub-Api-Version` (default `2026-03-10`).
 - `GITHUB_REPO_OWNER`: owner por defecto para sobreescribir el owner parseado de `repoUrl` (opcional).
@@ -21,6 +26,11 @@ Ejemplo de `.env`:
 
 ```bash
 GITHUB_TOKEN=github_pat_xxx
+GITHUB_CLIENT_ID=Iv1.xxxxxxxxxx
+GITHUB_CLIENT_SECRET=xxxxxxxxxx
+ALLOWED_EMAIL_DOMAINS=example.dominio.pe,dominio.pe
+AUTH_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+AUTH_TRUST_HOST=true
 GITHUB_API_BASE_URL=https://api.github.com
 GITHUB_API_VERSION=2026-04-15
 GITHUB_REPO_OWNER=atdetquizan
@@ -30,8 +40,15 @@ GITHUB_REPO_OWNER=atdetquizan
 
 - `npm install` (o `npm ci` en CI; usa `--legacy-peer-deps` solo si algún peer falla).
 - `npm run dev` — servidor local en <http://localhost:4321/>.
-- `npm run build` — genera `dist/` estático con base `/`.
+- `npm run build` — genera el bundle servidor en `dist/`.
 - `npm run preview` — prueba el build generado.
+
+## Login con GitHub
+
+- Configura una OAuth App en GitHub con callback URL: `http://localhost:4321/api/auth/callback/github`
+- Para producción usa: `https://<tu-dominio>/api/auth/callback/github`
+- El acceso a rutas de la plataforma queda protegido por middleware; sin sesión se redirige a `/login/`.
+- Si `ALLOWED_EMAIL_DOMAINS` está definido, solo ingresan usuarios con email de esos dominios.
 
 URLs útiles en local:
 

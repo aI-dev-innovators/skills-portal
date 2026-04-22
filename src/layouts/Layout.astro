@@ -1,7 +1,25 @@
 ---
 import '../styles/global.css';
+import { getSession } from 'auth-astro/server';
 
 const { title = 'Skills Portal', description = 'Portal interno de skills' } = Astro.props;
+const session = await getSession(Astro.request);
+const displayName = session?.user?.name || session?.user?.email || 'Usuario';
+const avatar = session?.user?.image || null;
+const currentPath = Astro.url.pathname.replace(/\/+$/, '') || '/';
+
+const navItems = [
+  { href: '/', label: 'Inicio' },
+  { href: '/skills', label: 'Skills' },
+  { href: '/rankings', label: 'Rankings' },
+  { href: '/repos', label: 'Repos' }
+];
+
+function isActivePath(href: string): boolean {
+  const normalizedHref = href.replace(/\/+$/, '') || '/';
+  if (normalizedHref === '/') return currentPath === '/';
+  return currentPath === normalizedHref || currentPath.startsWith(`${normalizedHref}/`);
+}
 ---
 
 <!DOCTYPE html>
@@ -13,18 +31,33 @@ const { title = 'Skills Portal', description = 'Portal interno de skills' } = As
     <meta name="description" content={description} />
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Saltar al contenido</a>
     <header class="site-header">
-      <div class="shell">
-        <div class="brand">Skills Portal</div>
-        <nav>
-          <a href="/">Inicio</a>
-          <a href="/skills/">Skills</a>
-          <a href="/rankings/">Rankings</a>
-          <a href="/repos/">Repos</a>
+      <div class="shell shell--header">
+        <a class="brand" href="/" aria-label="Ir al inicio de Skills Portal">Skills Portal</a>
+        <nav class="main-nav" aria-label="Navegacion principal">
+          {navItems.map((item) => (
+            <a
+              href={item.href}
+              class:list={{ 'is-active': isActivePath(item.href) }}
+              aria-current={isActivePath(item.href) ? 'page' : undefined}
+            >
+              {item.label}
+            </a>
+          ))}
         </nav>
+        {session?.user ? (
+          <div class="auth-user" aria-label="Sesion activa">
+            {avatar ? <img src={avatar} alt="Avatar" class="auth-avatar" /> : <span class="auth-avatar auth-avatar-fallback">{displayName.slice(0, 1).toUpperCase()}</span>}
+            <span class="auth-name">{displayName}</span>
+            <button id="logout-button" class="auth-action" type="button">Salir</button>
+          </div>
+        ) : (
+          <a class="auth-action" href="/login/">Ingresar</a>
+        )}
       </div>
     </header>
-    <main class="shell">
+    <main id="main-content" class="shell">
       <slot />
     </main>
     <footer class="site-footer">
@@ -38,6 +71,7 @@ const { title = 'Skills Portal', description = 'Portal interno de skills' } = As
 
     <script>
       import { trackLinkClick } from '../lib/client-telemetry';
+      import { signOutUser } from '../lib/auth-client';
 
       // Preloader para transiciones de página y clics en navegación.
       const loader = document.getElementById('page-loader');
@@ -63,6 +97,12 @@ const { title = 'Skills Portal', description = 'Portal interno de skills' } = As
         if (newTab || isDownload || isAnchor || isMail || isTel) return;
         trackLinkClick(href);
         showLoader();
+      });
+
+      const logoutButton = document.getElementById('logout-button');
+      logoutButton?.addEventListener('click', async () => {
+        showLoader();
+        await signOutUser();
       });
     </script>
   </body>

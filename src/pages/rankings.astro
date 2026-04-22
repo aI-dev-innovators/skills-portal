@@ -55,7 +55,12 @@ function getBadgeHTML(badgeType: BadgeType) {
     </div>
 
     <div class="ranking-table">
-      {ranked.map((skillScore: SkillScore, index: number) => {
+      {ranked.length === 0 ? (
+        <article class="ranking-empty">
+          <h3>Sin datos de ranking</h3>
+          <p>Aún no hay skills con metadata suficiente para calcular score.</p>
+        </article>
+      ) : ranked.map((skillScore: SkillScore, index: number) => {
         const skill = skills.find((s: SkillDoc) => s.id === skillScore.skillId);
         if (!skill) return null;
         const percentile = getPercentileRank(skills, skillScore.skillId);
@@ -117,16 +122,11 @@ function getBadgeHTML(badgeType: BadgeType) {
   </section>
 
   <style>
-    :global(body) {
-      background: #07090f;
-      color: #e5e7eb;
-    }
-
     .hero {
-      background: radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.12), transparent 35%),
-        radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.16), transparent 32%),
-        #0c101a;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: radial-gradient(circle at 20% 20%, rgba(61, 217, 196, 0.18), transparent 35%),
+        radial-gradient(circle at 80% 0%, rgba(255, 180, 84, 0.14), transparent 32%),
+        var(--panel);
+      border: 1px solid var(--border);
       border-radius: 18px;
       padding: 2rem;
       margin-bottom: 2rem;
@@ -136,7 +136,7 @@ function getBadgeHTML(badgeType: BadgeType) {
       text-transform: uppercase;
       letter-spacing: 0.12em;
       font-size: 0.8rem;
-      color: #a5b4fc;
+      color: #8cd8cd;
       margin: 0 0 0.4rem;
     }
 
@@ -147,7 +147,7 @@ function getBadgeHTML(badgeType: BadgeType) {
     }
 
     .lede {
-      color: #cbd5e1;
+      color: var(--muted);
       margin: 0.6rem 0 1.2rem;
       max-width: 720px;
       line-height: 1.5;
@@ -155,7 +155,7 @@ function getBadgeHTML(badgeType: BadgeType) {
 
     .score-formula {
       background: rgba(148, 163, 184, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 1rem;
       margin-top: 1.5rem;
@@ -191,6 +191,23 @@ function getBadgeHTML(badgeType: BadgeType) {
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
+    }
+
+    .ranking-empty {
+      margin: 0;
+      padding: 1rem;
+      border-radius: 12px;
+      border: 1px dashed var(--border-strong);
+      background: color-mix(in srgb, var(--panel) 82%, transparent);
+    }
+
+    .ranking-empty h3 {
+      margin: 0 0 0.35rem;
+    }
+
+    .ranking-empty p {
+      margin: 0;
+      color: var(--muted);
     }
 
     .ranking-row {

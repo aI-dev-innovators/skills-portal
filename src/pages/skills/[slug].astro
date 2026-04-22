@@ -198,12 +198,12 @@ const skillFileWebUrl = repoContext
       justify-content: space-between;
       gap: 0.95rem;
       padding: 1.1rem;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border);
       border-radius: 16px;
-      background: radial-gradient(circle at 15% 18%, rgba(56, 189, 248, 0.12), transparent 43%),
-        radial-gradient(circle at 86% 2%, rgba(14, 116, 144, 0.18), transparent 36%),
+      background: radial-gradient(circle at 15% 18%, rgba(61, 217, 196, 0.18), transparent 43%),
+        radial-gradient(circle at 86% 2%, rgba(255, 180, 84, 0.14), transparent 36%),
         var(--panel);
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow-soft);
       margin-bottom: 1rem;
     }
     .skill-hero-main {
@@ -577,7 +577,7 @@ const skillFileWebUrl = repoContext
       `).join('');
     }
   </script>
-  <script id="skill-profile-json" type="application/json" set:html={JSON.stringify({
+  <script is:inline id="skill-profile-json" type="application/json" set:html={JSON.stringify({
     id: skill.id,
     title: skill.title,
     url: skill.url,
@@ -588,5 +588,5 @@ const skillFileWebUrl = repoContext
     tags: skill.tags,
     score: skill.score
   })}></script>
-  <script id="skill-recommendation-catalog" type="application/json" set:html={JSON.stringify(recommendationCatalog)}></script>
+  <script is:inline id="skill-recommendation-catalog" type="application/json" set:html={JSON.stringify(recommendationCatalog)}></script>
 </Layout>

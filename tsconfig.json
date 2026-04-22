@@ -17,8 +17,10 @@
     "baseUrl": "."
   },
   "include": [
+    "env.d.ts",
     "src",
     "scripts",
+    "auth.config.ts",
     "astro.config.mjs",
     "package.json"
   ]

@@ -15,7 +15,10 @@
   },
   "dependencies": {
     "@astrojs/check": "^0.9.8",
+    "@astrojs/node": "^9.5.5",
+    "@auth/core": "^0.37.4",
     "astro": "^5.17.0",
+    "auth-astro": "^4.2.0",
     "dotenv": "^16.4.5",
     "gray-matter": "^4.0.3",
     "lunr": "^2.3.9",
