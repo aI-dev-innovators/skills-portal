@@ -14,6 +14,8 @@ function isAllowedDomain(email?: string | null): boolean {
 }
 
 export default defineConfig({
+  secret: import.meta.env.AUTH_SECRET,
+  trustHost: true,
   providers: [
     GitHub({
       clientId: import.meta.env.GITHUB_CLIENT_ID || '',
