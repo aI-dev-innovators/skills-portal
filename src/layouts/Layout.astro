@@ -1,11 +1,11 @@
 ---
 import '../styles/global.css';
-import { getSession } from 'auth-astro/server';
 
 const { title = 'Skills Portal', description = 'Portal interno de skills' } = Astro.props;
-const session = await getSession(Astro.request);
-const displayName = session?.user?.name || session?.user?.email || 'Usuario';
-const avatar = session?.user?.image || null;
+const session = Astro.locals.session;
+const user = Astro.locals.user;
+const displayName = user?.name || user?.email || 'Usuario';
+const avatar = user?.image || null;
 const currentPath = Astro.url.pathname.replace(/\/+$/, '') || '/';
 
 const navItems = [
@@ -46,7 +46,7 @@ function isActivePath(href: string): boolean {
             </a>
           ))}
         </nav>
-        {session?.user ? (
+        {session && user ? (
           <div class="auth-user" aria-label="Sesion activa">
             {avatar ? <img src={avatar} alt="Avatar" class="auth-avatar" /> : <span class="auth-avatar auth-avatar-fallback">{displayName.slice(0, 1).toUpperCase()}</span>}
             <span class="auth-name">{displayName}</span>
@@ -71,7 +71,7 @@ function isActivePath(href: string): boolean {
 
     <script>
       import { trackLinkClick } from '../lib/client-telemetry';
-      const { signOut } = await import('auth-astro/client');
+      const { signOut } = await import('../lib/auth-client');
 
       // Preloader para transiciones de página y clics en navegación.
       const loader = document.getElementById('page-loader');
@@ -102,7 +102,13 @@ function isActivePath(href: string): boolean {
       const logoutButton = document.getElementById('logout-button');
       logoutButton?.addEventListener('click', async () => {
         showLoader();
-        await signOut();
+        await signOut({
+          fetchOptions: {
+            onSuccess: () => {
+              window.location.href = '/login/';
+            }
+          }
+        });
       });
     </script>
   </body>

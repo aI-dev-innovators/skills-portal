@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'astro';
-import { getSession } from 'auth-astro/server';
+import { auth, isAllowedEmailDomain } from './lib/auth';
 
 const authDebugEnabled =
   (import.meta.env.AUTH_DEBUG_LOGS || process.env.AUTH_DEBUG_LOGS || '').toLowerCase() === 'true';
@@ -34,18 +34,6 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     });
   }
 
-  // GitHub/Auth.js puede volver al callback sin slash final.
-  // Con trailingSlash=always Astro devuelve 404, por eso normalizamos aqui.
-  if (/^\/api\/auth\/callback\/[^/]+$/.test(pathname)) {
-    const normalized = new URL(context.request.url);
-    normalized.pathname = `${pathname}/`;
-    authDebugLog('Redirecting callback route to trailing slash', {
-      from: pathname,
-      to: normalized.pathname
-    });
-    return context.redirect(normalized.toString(), 308);
-  }
-
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/api/auth') ||
@@ -62,22 +50,38 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     return response;
   }
 
-  const session = await getSession(context.request);
+  const sessionData = await auth.api.getSession({
+    headers: req.headers
+  });
 
-  if (!session?.user) {
+  context.locals.user = sessionData?.user ?? null;
+  context.locals.session = sessionData?.session ?? null;
+
+  const hasAllowedDomain = isAllowedEmailDomain(sessionData?.user?.email);
+
+  if (!sessionData?.session || !sessionData.user || !hasAllowedDomain) {
     if (pathname.startsWith('/api/')) {
       authDebugLog('Blocked API request without session', {
         pathname,
         method: req.method
       });
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
+
+      const status = sessionData?.session && sessionData.user && !hasAllowedDomain ? 403 : 401;
+      const error = status === 403 ? 'ForbiddenDomain' : 'Unauthorized';
+
+      return new Response(JSON.stringify({ error }), {
+        status,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    authDebugLog('Redirecting anonymous user to login', { pathname });
-    return context.redirect('/login/');
+    authDebugLog('Redirecting user to login', {
+      pathname,
+      reason: !sessionData?.session ? 'NoSession' : 'ForbiddenDomain'
+    });
+
+    const target = !sessionData?.session ? '/login/' : '/login/?error=AccessDenied';
+    return context.redirect(target);
   }
 
   return next();

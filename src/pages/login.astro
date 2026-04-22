@@ -1,8 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { getSession } from 'auth-astro/server';
 
-const session = await getSession(Astro.request);
+const session = Astro.locals.session;
 const authError = Astro.url.searchParams.get('error');
 const allowedDomains = (import.meta.env.ALLOWED_EMAIL_DOMAINS || 'example.dominio.pe,dominio.pe')
   .split(',')
@@ -10,7 +9,7 @@ const allowedDomains = (import.meta.env.ALLOWED_EMAIL_DOMAINS || 'example.domini
   .filter(Boolean);
 const allowedDomainsLabel = allowedDomains.map((domain) => `@${domain}`).join(', ');
 
-if (session?.user) {
+if (session && authError !== 'AccessDenied') {
   return Astro.redirect('/');
 }
 
@@ -37,11 +36,14 @@ const errorMessage =
   </section>
 
   <script>
-    const { signIn } = await import('auth-astro/client');
+    const { signIn } = await import('../lib/auth-client');
     const button = document.getElementById('github-login');
 
     button?.addEventListener('click', async () => {
-      await signIn('github');
+      await signIn.social({
+        provider: 'github',
+        callbackURL: '/'
+      });
     });
   </script>
 </Layout>

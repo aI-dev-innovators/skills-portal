@@ -1,6 +1,6 @@
 # skills-portal
 
-Portal de skills con Astro 5 en modo servidor: lee README y SKILL.md desde GitHub con token de solo lectura e integra autenticación con GitHub OAuth para acceso a la plataforma.
+Portal de skills con Astro 5 en modo servidor: lee README y SKILL.md desde GitHub con token de solo lectura e integra autenticación con Better Auth + GitHub OAuth para acceso a la plataforma.
 
 ## Requisitos rápidos
 
@@ -16,10 +16,10 @@ Portal de skills con Astro 5 en modo servidor: lee README y SKILL.md desde GitHu
 - `GITHUB_CLIENT_ID`: Client ID de la GitHub OAuth App.
 - `GITHUB_CLIENT_SECRET`: Client Secret de la GitHub OAuth App.
 - `ALLOWED_EMAIL_DOMAINS`: lista separada por comas de dominios permitidos para login (ej. `example.dominio.pe,dominio.pe`).
-- `AUTH_SECRET`: secreto para firmar sesión/cookies de Auth.js.
-- `AUTH_URL`: URL canónica pública de Auth.js (ej. `https://skills-portal-one.vercel.app`).
-  - Recomendado en Vercel para evitar que Auth resuelva `localhost` en cookies `callback-url`.
-- `AUTH_TRUST_HOST`: usar `true` detrás de proxy/plataformas gestionadas.
+- `BETTER_AUTH_SECRET`: secreto principal de Better Auth (recomendado: 32+ caracteres aleatorios).
+- `BETTER_AUTH_URL`: URL canónica pública para resolver callbacks y cookies de autenticación.
+- `AUTH_SECRET`: fallback compatible si no defines `BETTER_AUTH_SECRET`.
+- `AUTH_URL`: fallback compatible si no defines `BETTER_AUTH_URL`.
 - `GITHUB_API_BASE_URL`: base de la API REST de GitHub (default `https://api.github.com`).
 - `GITHUB_API_VERSION`: versión de API enviada en `X-GitHub-Api-Version` (default `2026-03-10`).
 - `GITHUB_REPO_OWNER`: owner por defecto para sobreescribir el owner parseado de `repoUrl` (opcional).
@@ -31,9 +31,8 @@ GITHUB_TOKEN=github_pat_xxx
 GITHUB_CLIENT_ID=Iv1.xxxxxxxxxx
 GITHUB_CLIENT_SECRET=xxxxxxxxxx
 ALLOWED_EMAIL_DOMAINS=example.dominio.pe,dominio.pe
-AUTH_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-AUTH_URL=https://skills-portal-one.vercel.app
-AUTH_TRUST_HOST=true
+BETTER_AUTH_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+BETTER_AUTH_URL=https://skills-portal-one.vercel.app
 GITHUB_API_BASE_URL=https://api.github.com
 GITHUB_API_VERSION=2026-04-15
 GITHUB_REPO_OWNER=atdetquizan
@@ -91,8 +90,8 @@ URLs útiles en local:
 - Workflows: `.github/workflows/build.yml` valida build y `.github/workflows/deploy.yml` publica en Pages (usa `npm ci`, cache npm y requiere `GITHUB_TOKEN`).
 - En Vercel, el proyecto ahora usa el adapter oficial de Vercel automáticamente cuando detecta `VERCEL=true`.
 - Si aparece `404: NOT_FOUND` en Vercel, revisa que el deployment sea de este repo/rama y que no esté apuntando a un output estático antiguo.
-- Variables mínimas en Vercel: `GITHUB_TOKEN` (o `GITHUB_PAT`), `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `AUTH_SECRET`, `AUTH_URL`, `AUTH_TRUST_HOST=true`, `ALLOWED_EMAIL_DOMAINS`.
-- Si aparece `Cross-site POST form submissions are forbidden`, revisa `AUTH_URL`/`NEXTAUTH_URL` por ambiente y confirma que ninguna variable apunte a `http://localhost`.
+- Variables mínimas en Vercel: `GITHUB_TOKEN` (o `GITHUB_PAT`), `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `ALLOWED_EMAIL_DOMAINS`.
+- Si aparece rechazo de origen o callback en login, revisa `BETTER_AUTH_URL` por ambiente y confirma que ninguna variable de URL de auth apunte a `http://localhost`.
 
 ## Depuración
 

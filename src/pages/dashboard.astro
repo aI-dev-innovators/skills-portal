@@ -1,0 +1,16 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+const session = Astro.locals.session;
+---
+
+<Layout title="Dashboard" description="Panel de sesión">
+  <section style="display:grid;gap:1rem;max-width:720px;">
+    <h1>Dashboard</h1>
+    <p>Usuario: {user?.name ?? user?.email ?? 'No autenticado'}</p>
+    <p>Sesion: {session ? 'Activa' : 'Inactiva'}</p>
+  </section>
+</Layout>
