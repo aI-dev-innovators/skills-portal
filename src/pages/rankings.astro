@@ -136,7 +136,7 @@ function getBadgeHTML(badgeType: BadgeType) {
       text-transform: uppercase;
       letter-spacing: 0.12em;
       font-size: 0.8rem;
-      color: #8cd8cd;
+      color: var(--login-eyebrow);
       margin: 0 0 0.4rem;
     }
 
@@ -154,7 +154,7 @@ function getBadgeHTML(badgeType: BadgeType) {
     }
 
     .score-formula {
-      background: rgba(148, 163, 184, 0.1);
+      background: color-mix(in srgb, var(--panel-elevated) 80%, transparent);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 1rem;
@@ -165,11 +165,11 @@ function getBadgeHTML(badgeType: BadgeType) {
       margin: 0 0 0.2rem;
       font-size: 0.95rem;
       font-weight: 600;
-      color: #e0f2fe;
+      color: var(--text);
     }
 
     .score-formula small {
-      color: #94a3b8;
+      color: var(--muted);
       font-size: 0.85rem;
     }
 
@@ -216,15 +216,15 @@ function getBadgeHTML(badgeType: BadgeType) {
       gap: 1rem;
       align-items: center;
       padding: 1rem 1.25rem;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: color-mix(in srgb, var(--panel-elevated) 80%, transparent);
+      border: 1px solid var(--border);
       border-radius: 12px;
       transition: all 0.2s;
     }
 
     .ranking-row:hover {
-      background: rgba(255, 255, 255, 0.04);
-      border-color: rgba(255, 255, 255, 0.12);
+      background: color-mix(in srgb, var(--panel-elevated) 88%, transparent);
+      border-color: var(--border-strong);
       transform: translateX(4px);
     }
 
@@ -238,12 +238,12 @@ function getBadgeHTML(badgeType: BadgeType) {
     .rank-num {
       font-size: 1.4rem;
       font-weight: 700;
-      color: #bae6fd;
+      color: var(--accent-strong);
     }
 
     .percentile {
       font-size: 0.75rem;
-      color: #94a3b8;
+      color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
@@ -263,13 +263,13 @@ function getBadgeHTML(badgeType: BadgeType) {
     .skill-title {
       font-size: 1.05rem;
       font-weight: 600;
-      color: #e5e7eb;
+      color: var(--text);
       text-decoration: none;
       margin: 0;
     }
 
     .skill-title:hover {
-      color: #bae6fd;
+      color: var(--accent);
     }
 
     .skill-meta {
@@ -280,7 +280,7 @@ function getBadgeHTML(badgeType: BadgeType) {
 
     .repo-ref {
       font-size: 0.85rem;
-      color: #94a3b8;
+      color: var(--muted);
       text-transform: lowercase;
       letter-spacing: 0.05em;
     }
@@ -288,17 +288,17 @@ function getBadgeHTML(badgeType: BadgeType) {
     .level-badge {
       padding: 0.2rem 0.6rem;
       border-radius: 999px;
-      background: rgba(56, 189, 248, 0.15);
-      color: #bae6fd;
+      background: var(--action-bg);
+      color: var(--action-text);
       font-size: 0.8rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      border: 1px solid rgba(56, 189, 248, 0.3);
+      border: 1px solid var(--border-strong);
     }
 
     .skill-desc {
       font-size: 0.95rem;
-      color: #cbd5e1;
+      color: var(--muted);
       margin: 0;
       line-height: 1.4;
     }
@@ -337,12 +337,12 @@ function getBadgeHTML(badgeType: BadgeType) {
     .score-value {
       font-size: 1.8rem;
       font-weight: 700;
-      color: #bae6fd;
+      color: var(--accent-strong);
     }
 
     .score-percent {
       font-size: 0.9rem;
-      color: #94a3b8;
+      color: var(--muted);
     }
 
     .score-breakdown {
@@ -359,11 +359,11 @@ function getBadgeHTML(badgeType: BadgeType) {
     }
 
     .component .label {
-      color: #94a3b8;
+      color: var(--muted);
     }
 
     .component .value {
-      color: #cbd5e1;
+      color: var(--text);
       font-weight: 600;
     }
 
@@ -377,7 +377,7 @@ function getBadgeHTML(badgeType: BadgeType) {
         flex-direction: row;
         justify-content: space-between;
         padding-bottom: 0.5rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid var(--border);
       }
 
       .rank-score {
@@ -385,7 +385,7 @@ function getBadgeHTML(badgeType: BadgeType) {
         justify-content: space-between;
         align-items: center;
         padding-top: 0.5rem;
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        border-top: 1px solid var(--border);
       }
     }
   </style>

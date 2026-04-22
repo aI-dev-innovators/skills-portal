@@ -9,6 +9,8 @@
   --accent: #3dd9c4;
   --accent-strong: #12b6a1;
   --accent-warm: #ffb454;
+  --success: #158a5d;
+  --danger: #b42845;
   --border: rgba(16, 32, 51, 0.14);
   --border-strong: rgba(16, 32, 51, 0.24);
   --radius: 14px;
@@ -38,8 +40,10 @@
   --pre-bg: #f1f7ff;
   --pre-text: #18334a;
   --pre-border: rgba(16, 32, 51, 0.12);
-  --loader-bg: rgba(244, 247, 251, 0.82);
+  --loader-bg: rgba(244, 247, 251, 0.68);
+  --loader-text: #102033;
   --spinner-track: rgba(16, 32, 51, 0.16);
+  --spinner-active: #12b6a1;
   --login-eyebrow: #1a8f86;
   --login-body: #4f6176;
   --login-error-bg: rgba(201, 44, 44, 0.11);
@@ -60,6 +64,8 @@
   --muted: #98aec5;
   --border: rgba(152, 174, 197, 0.28);
   --border-strong: rgba(152, 174, 197, 0.42);
+  --success: #7af0c4;
+  --danger: #ff9fb4;
   --shadow-soft: 0 14px 40px rgba(0, 0, 0, 0.3);
   --shadow-strong: 0 24px 70px rgba(0, 0, 0, 0.38);
   --bg-glow-cool: rgba(61, 217, 196, 0.16);
@@ -85,8 +91,10 @@
   --pre-bg: #0a1927;
   --pre-text: #e5eef8;
   --pre-border: rgba(255, 255, 255, 0.09);
-  --loader-bg: rgba(10, 17, 24, 0.82);
+  --loader-bg: rgba(10, 17, 24, 0.76);
+  --loader-text: #ebf3ff;
   --spinner-track: rgba(255, 255, 255, 0.12);
+  --spinner-active: #ffb454;
   --login-eyebrow: #8cd8cd;
   --login-body: #c1d2e5;
   --login-error-bg: rgba(122, 29, 29, 0.35);
@@ -691,7 +699,13 @@ textarea::placeholder {
   pointer-events: none;
   transition: opacity 150ms ease;
   z-index: 999;
-  color: var(--text);
+  color: var(--loader-text);
+}
+
+#page-loader p {
+  margin: 0;
+  color: var(--loader-text);
+  font-weight: 650;
 }
 
 #page-loader.visible {
@@ -704,7 +718,7 @@ textarea::placeholder {
   height: 42px;
   border-radius: 50%;
   border: 4px solid var(--spinner-track);
-  border-top-color: var(--accent-warm);
+  border-top-color: var(--spinner-active);
   animation: spin 0.9s linear infinite;
 }
 

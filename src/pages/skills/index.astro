@@ -30,6 +30,11 @@ const frameworkDistribution = frameworkOptions
   }))
   .sort((a, b) => b.count - a.count)
   .slice(0, 4);
+
+const CARD_FRAMEWORK_LIMIT = 2;
+const CARD_TEST_TYPE_LIMIT = 2;
+const CARD_BADGE_LIMIT = 2;
+const CARD_ASSET_LIMIT = 3;
 ---
 <Layout title="Skills" description="Catálogo de skills con metadata enriquecida">
   <section class="hero">
@@ -172,44 +177,68 @@ const frameworkDistribution = frameworkOptions
     ) : (
       <>
         <div class="skills-grid" id="skills-grid">
-          {skills.map((skill) => (
-            <article
-              class="skill-card"
-              data-title={skill.title.toLowerCase()}
-              data-desc={skill.description.toLowerCase()}
-              data-tags={(skill.tags || []).join(' ').toLowerCase()}
-              data-frameworks={(skill.frameworks || []).join(' ').toLowerCase()}
-              data-level={(skill.level || '').toLowerCase()}
-              data-test-types={(skill.testTypes || []).join(' ').toLowerCase()}
-              data-status={(skill.status || '').toLowerCase()}
-              data-repo={(skill.repoName || skill.repoId || '').toLowerCase()}
-              data-has-examples={skill.hasExamples ? 'true' : 'false'}
-            >
-              <header>
-                <p class="repo">{skill.repoName || skill.repoId}</p>
-                <h3><a href={`/skills/${skill.id}/`}>{skill.title}</a></h3>
-                <p class="desc">{skill.description}</p>
-              </header>
+          {skills.map((skill) => {
+            const frameworks = skill.frameworks || [];
+            const testTypes = skill.testTypes || [];
+            const badges = skill.badges || [];
+            const assets = [
+              skill.hasExamples ? 'Examples' : null,
+              skill.hasTemplates ? 'Templates' : null,
+              skill.hasEvals ? 'Evals' : null,
+              skill.hasScripts ? 'Scripts' : null,
+              skill.status === 'recommended' ? 'Recommended' : null
+            ].filter((asset): asset is string => Boolean(asset));
 
-              <div class="meta-row">
-                <span class="meta-chip">{skill.level}</span>
-                <span class="meta-chip">{skill.status}</span>
-                {typeof skill.estimatedTime === 'number' && <span class="meta-chip">{skill.estimatedTime} min</span>}
-                <span class="meta-chip">v{skill.version}</span>
-              </div>
+            const visibleFrameworks = frameworks.slice(0, CARD_FRAMEWORK_LIMIT);
+            const visibleTestTypes = testTypes.slice(0, CARD_TEST_TYPE_LIMIT);
+            const visibleBadges = badges.slice(0, CARD_BADGE_LIMIT);
+            const visibleAssets = assets.slice(0, CARD_ASSET_LIMIT);
 
-              <div class="taxonomy-row">
-                {(skill.frameworks || []).map((framework) => (
-                  <span class="tag framework">{framework}</span>
-                ))}
-                {(skill.testTypes || []).map((testType) => (
-                  <span class="tag type">{testType}</span>
-                ))}
-              </div>
+            const hiddenFrameworks = Math.max(frameworks.length - visibleFrameworks.length, 0);
+            const hiddenTestTypes = Math.max(testTypes.length - visibleTestTypes.length, 0);
+            const hiddenBadges = Math.max(badges.length - visibleBadges.length, 0);
+            const hiddenAssets = Math.max(assets.length - visibleAssets.length, 0);
 
-              {(skill.badges || []).length > 0 && (
+            return (
+              <article
+                class="skill-card"
+                data-title={skill.title.toLowerCase()}
+                data-desc={skill.description.toLowerCase()}
+                data-tags={(skill.tags || []).join(' ').toLowerCase()}
+                data-frameworks={frameworks.join(' ').toLowerCase()}
+                data-level={(skill.level || '').toLowerCase()}
+                data-test-types={testTypes.join(' ').toLowerCase()}
+                data-status={(skill.status || '').toLowerCase()}
+                data-repo={(skill.repoName || skill.repoId || '').toLowerCase()}
+                data-has-examples={skill.hasExamples ? 'true' : 'false'}
+              >
+                <header>
+                  <p class="repo">{skill.repoName || skill.repoId}</p>
+                  <h3><a href={`/skills/${skill.id}/`}>{skill.title}</a></h3>
+                  <p class="desc">{skill.description}</p>
+                </header>
+
+                <div class="meta-row">
+                  <span class="meta-chip">{skill.level}</span>
+                  <span class="meta-chip">{skill.status}</span>
+                  {typeof skill.estimatedTime === 'number' && <span class="meta-chip">{skill.estimatedTime} min</span>}
+                  <span class="meta-chip">v{skill.version}</span>
+                </div>
+
+                <div class="taxonomy-row">
+                  {visibleFrameworks.map((framework) => (
+                    <span class="tag framework">{framework}</span>
+                  ))}
+                  {hiddenFrameworks > 0 && <span class="tag tag--overflow">+{hiddenFrameworks}</span>}
+
+                  {visibleTestTypes.map((testType) => (
+                    <span class="tag type">{testType}</span>
+                  ))}
+                  {hiddenTestTypes > 0 && <span class="tag tag--overflow">+{hiddenTestTypes}</span>}
+                </div>
+
                 <div class="badge-row">
-                  {(skill.badges || []).map((badgeType) => {
+                  {visibleBadges.map((badgeType) => {
                     const badgeDef = getBadgeDefinition(badgeType);
                     const colorMap = {
                       'green': '#10b981',
@@ -229,18 +258,18 @@ const frameworkDistribution = frameworkOptions
                       </span>
                     );
                   })}
+                  {hiddenBadges > 0 && <span class="auto-badge auto-badge--overflow">+{hiddenBadges}</span>}
                 </div>
-              )}
 
-              <div class="asset-row">
-                {skill.hasExamples && <span class="badge">Examples</span>}
-                {skill.hasTemplates && <span class="badge">Templates</span>}
-                {skill.hasEvals && <span class="badge">Evals</span>}
-                {skill.hasScripts && <span class="badge">Scripts</span>}
-                {skill.status === 'recommended' && <span class="badge featured">Recommended</span>}
-              </div>
-            </article>
-          ))}
+                <div class="asset-row">
+                  {visibleAssets.map((asset) => (
+                    <span class={`badge${asset === 'Recommended' ? ' featured' : ''}`}>{asset}</span>
+                  ))}
+                  {hiddenAssets > 0 && <span class="badge badge--overflow">+{hiddenAssets}</span>}
+                </div>
+              </article>
+            );
+          })}
         </div>
         <p id="skills-empty-state" class="empty-results" hidden>
           No hay skills que coincidan con los filtros actuales.
@@ -275,7 +304,7 @@ const frameworkDistribution = frameworkOptions
       text-transform: uppercase;
       letter-spacing: 0.12em;
       font-size: 0.8rem;
-      color: #8cd8cd;
+      color: var(--login-eyebrow);
       margin: 0 0 0.4rem;
     }
 
@@ -319,7 +348,7 @@ const frameworkDistribution = frameworkOptions
       font-size: 0.8rem;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: #8cd8cd;
+      color: var(--login-eyebrow);
       font-weight: 700;
     }
 
@@ -332,18 +361,18 @@ const frameworkDistribution = frameworkOptions
       margin: 0;
       padding: 0.44rem 0.55rem;
       border-radius: 8px;
-      background: rgba(2, 6, 23, 0.42);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: color-mix(in srgb, var(--panel-elevated) 82%, transparent);
+      border: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
       font-size: 0.85rem;
-      color: #cbd5e1;
+      color: var(--muted);
     }
 
     .insight-list strong {
-      color: #e2e8f0;
+      color: var(--text);
       font-size: 0.9rem;
     }
 
@@ -355,17 +384,17 @@ const frameworkDistribution = frameworkOptions
     .framework-row {
       padding: 0.44rem 0.55rem;
       border-radius: 8px;
-      background: rgba(2, 6, 23, 0.42);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: color-mix(in srgb, var(--panel-elevated) 82%, transparent);
+      border: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-size: 0.85rem;
-      color: #cbd5e1;
+      color: var(--muted);
     }
 
     .framework-row strong {
-      color: #e2e8f0;
+      color: var(--text);
       min-width: 26px;
       text-align: right;
     }
@@ -377,9 +406,9 @@ const frameworkDistribution = frameworkOptions
     }
 
     .hero-links a {
-      border: 1px solid rgba(125, 211, 252, 0.26);
-      background: rgba(14, 116, 144, 0.14);
-      color: #bae6fd;
+      border: 1px solid var(--border-strong);
+      background: var(--action-bg);
+      color: var(--action-text);
       text-decoration: none;
       border-radius: 8px;
       padding: 0.35rem 0.6rem;
@@ -388,13 +417,13 @@ const frameworkDistribution = frameworkOptions
     }
 
     .hero-links a:hover {
-      background: rgba(14, 116, 144, 0.24);
-      color: #e0f2fe;
+      background: var(--action-bg-hover);
+      color: var(--nav-active-text);
     }
 
     .kpi-card {
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: color-mix(in srgb, var(--panel-elevated) 78%, transparent);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 0.9rem 1rem;
       display: grid;
@@ -402,7 +431,7 @@ const frameworkDistribution = frameworkOptions
     }
 
     .kpi-card span {
-      color: #94a3b8;
+      color: var(--muted);
       font-size: 0.9rem;
       text-transform: uppercase;
       letter-spacing: 0.06em;
@@ -414,8 +443,8 @@ const frameworkDistribution = frameworkOptions
     }
 
     .facet-panel {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: color-mix(in srgb, var(--panel-elevated) 80%, transparent);
+      border: 1px solid var(--border);
       border-radius: 14px;
       padding: 0.95rem;
       backdrop-filter: blur(6px);
@@ -438,7 +467,7 @@ const frameworkDistribution = frameworkOptions
     }
 
     .panel-title {
-      color: #94a3b8;
+      color: var(--muted);
       margin: 0;
       font-weight: 600;
       font-size: 0.95rem;
@@ -455,7 +484,7 @@ const frameworkDistribution = frameworkOptions
       display: grid;
       gap: 0.28rem;
       font-size: 0.78rem;
-      color: #cbd5e1;
+      color: var(--muted);
       letter-spacing: 0.04em;
       text-transform: uppercase;
       font-weight: 600;
@@ -470,16 +499,16 @@ const frameworkDistribution = frameworkOptions
       width: 100%;
       padding: 0.72rem 0.8rem;
       border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: #0f172a;
-      color: #e5e7eb;
+      border: 1px solid var(--border);
+      background: var(--input-bg);
+      color: var(--text);
       font-size: 0.92rem;
       text-transform: none;
       font-weight: 500;
       letter-spacing: normal;
     }
 
-    input[type="search"]::placeholder { color: #64748b; }
+    input[type="search"]::placeholder { color: var(--placeholder); }
 
     input[type="checkbox"] { accent-color: #60a5fa; }
 
@@ -494,22 +523,22 @@ const frameworkDistribution = frameworkOptions
       align-items: center;
       gap: 0.5rem;
       font-size: 0.78rem;
-      color: #cbd5e1;
+      color: var(--text);
       margin-top: 0;
       text-transform: none;
       letter-spacing: normal;
       font-weight: 500;
       padding: 0.46rem 0.5rem;
       border-radius: 8px;
-      background: rgba(15, 23, 42, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: color-mix(in srgb, var(--panel-elevated) 82%, transparent);
+      border: 1px solid var(--border);
     }
 
     .facet-reset {
       width: 100%;
-      border: 1px solid rgba(125, 211, 252, 0.35);
-      background: rgba(14, 116, 144, 0.15);
-      color: #bae6fd;
+      border: 1px solid var(--border-strong);
+      background: var(--action-bg);
+      color: var(--action-text);
       border-radius: 10px;
       padding: 0.58rem 0.72rem;
       font-size: 0.84rem;
@@ -519,14 +548,14 @@ const frameworkDistribution = frameworkOptions
     }
 
     .facet-reset:hover {
-      background: rgba(14, 116, 144, 0.26);
-      border-color: rgba(125, 211, 252, 0.55);
-      color: #e0f2fe;
+      background: var(--action-bg-hover);
+      border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+      color: var(--nav-active-text);
     }
 
     .hint {
       margin: 0;
-      color: #94a3b8;
+      color: var(--muted);
       font-size: 0.82rem;
       line-height: 1.35;
     }
@@ -546,7 +575,7 @@ const frameworkDistribution = frameworkOptions
 
     .results-head p {
       margin: 0;
-      color: #94a3b8;
+      color: var(--muted);
       font-size: 0.9rem;
     }
 
@@ -559,9 +588,9 @@ const frameworkDistribution = frameworkOptions
     }
 
     .excel-export {
-      border: 1px solid rgba(125, 211, 252, 0.35);
-      background: rgba(14, 116, 144, 0.15);
-      color: #bae6fd;
+      border: 1px solid var(--border-strong);
+      background: var(--action-bg);
+      color: var(--action-text);
       border-radius: 10px;
       padding: 0.52rem 0.7rem;
       font-size: 0.82rem;
@@ -571,9 +600,9 @@ const frameworkDistribution = frameworkOptions
     }
 
     .excel-export:hover {
-      background: rgba(14, 116, 144, 0.26);
-      border-color: rgba(125, 211, 252, 0.55);
-      color: #e0f2fe;
+      background: var(--action-bg-hover);
+      border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+      color: var(--nav-active-text);
     }
 
     .skills-grid {
@@ -581,6 +610,7 @@ const frameworkDistribution = frameworkOptions
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 0.75rem;
+      align-items: stretch;
     }
 
     .pagination {
@@ -594,16 +624,16 @@ const frameworkDistribution = frameworkOptions
 
     .pagination p {
       margin: 0;
-      color: #94a3b8;
+      color: var(--muted);
       font-size: 0.86rem;
       min-width: 140px;
       text-align: center;
     }
 
     .pagination button {
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      background: rgba(148, 163, 184, 0.12);
-      color: #e2e8f0;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel-elevated) 82%, transparent);
+      color: var(--text);
       border-radius: 9px;
       padding: 0.45rem 0.75rem;
       font-size: 0.82rem;
@@ -631,38 +661,64 @@ const frameworkDistribution = frameworkOptions
       gap: 0.6rem;
       padding: 0.95rem;
       border-radius: 12px;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+      background: color-mix(in srgb, var(--panel-elevated) 80%, transparent);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-soft);
       transition: transform 160ms ease, box-shadow 160ms ease;
+      align-content: start;
+      height: 100%;
+    }
+
+    .skill-card header {
+      display: grid;
+      gap: 0.35rem;
+      min-height: 188px;
       align-content: start;
     }
 
     .skill-card:hover {
       transform: translateY(-1px);
-      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.32);
+      box-shadow: 0 18px 34px color-mix(in srgb, var(--text) 18%, transparent);
     }
 
     .repo {
       margin: 0;
-      color: #94a3b8;
+      color: var(--muted);
       font-size: 0.9rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    h3 {
+    .skill-card h3 {
       margin: 0.1rem 0;
       font-size: 1.05rem;
       line-height: 1.2;
+      min-height: calc(1.2em * 2);
     }
 
-    .desc {
+    .skill-card h3 a {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .skill-card .desc {
       margin: 0;
-      color: #cbd5e1;
+      color: var(--muted);
       font-size: 0.9rem;
       line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 5;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-height: calc(1.4em * 5);
     }
 
     .meta-row,
@@ -674,14 +730,17 @@ const frameworkDistribution = frameworkOptions
       flex-wrap: wrap;
       align-items: center;
       align-content: flex-start;
+      min-height: 30px;
+      max-height: 64px;
+      overflow: hidden;
     }
 
     .meta-chip {
       padding: 0.2rem 0.7rem;
       border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(148, 163, 184, 0.1);
-      color: #cbd5e1;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel-elevated) 80%, transparent);
+      color: var(--text);
       font-size: 0.82rem;
       text-transform: lowercase;
       display: inline-flex;
@@ -695,10 +754,10 @@ const frameworkDistribution = frameworkOptions
     .tag {
       padding: 0.2rem 0.7rem;
       border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: #cbd5e1;
+      border: 1px solid var(--border);
+      color: var(--text);
       font-size: 0.82rem;
-      background: rgba(148, 163, 184, 0.1);
+      background: color-mix(in srgb, var(--panel-elevated) 80%, transparent);
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -708,23 +767,31 @@ const frameworkDistribution = frameworkOptions
     }
 
     .tag.framework {
-      background: rgba(56, 189, 248, 0.14);
-      color: #bae6fd;
-      border-color: rgba(56, 189, 248, 0.3);
+      background: color-mix(in srgb, var(--accent) 15%, transparent);
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--accent) 45%, transparent);
     }
 
     .tag.type {
-      background: rgba(168, 85, 247, 0.16);
-      color: #ddd6fe;
-      border-color: rgba(168, 85, 247, 0.3);
+      background: color-mix(in srgb, var(--nav-active-bg) 62%, transparent);
+      color: var(--text);
+      border-color: var(--border-strong);
+    }
+
+    .tag--overflow {
+      background: transparent;
+      color: var(--muted);
+      border-style: dashed;
+      border-color: var(--border-strong);
+      font-weight: 700;
     }
 
     .badge {
       padding: 0.2rem 0.7rem;
       border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(148, 163, 184, 0.1);
-      color: #cbd5e1;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel-elevated) 82%, transparent);
+      color: var(--text);
       font-size: 0.82rem;
       font-weight: 600;
       display: inline-flex;
@@ -736,16 +803,24 @@ const frameworkDistribution = frameworkOptions
     }
 
     .badge.featured {
-      background: rgba(16, 185, 129, 0.2);
-      border-color: rgba(16, 185, 129, 0.45);
-      color: #a7f3d0;
+      background: color-mix(in srgb, var(--success) 16%, transparent);
+      border-color: color-mix(in srgb, var(--success) 50%, transparent);
+      color: var(--text);
+    }
+
+    .badge--overflow {
+      background: transparent;
+      color: var(--muted);
+      border-style: dashed;
+      border-color: var(--border-strong);
+      font-weight: 700;
     }
 
     .auto-badge {
       padding: 0.25rem 0.65rem;
       border-radius: 999px;
       border: 1px solid;
-      color: #cbd5e1;
+      color: var(--text);
       font-size: 0.8rem;
       font-weight: 600;
       display: inline-flex;
@@ -757,12 +832,20 @@ const frameworkDistribution = frameworkOptions
       gap: 0.3rem;
     }
 
+    .auto-badge--overflow {
+      background: transparent;
+      color: var(--muted);
+      border-style: dashed;
+      border-color: var(--border-strong);
+      font-weight: 700;
+    }
+
     a {
-      color: #e0f2fe;
+      color: var(--accent);
     }
 
     a:hover {
-      color: #67e8f9;
+      color: var(--link-hover);
     }
 
     @media (max-width: 1024px) {
@@ -812,6 +895,15 @@ const frameworkDistribution = frameworkOptions
       }
       .pagination {
         justify-content: center;
+      }
+
+      .skill-card header {
+        min-height: auto;
+      }
+
+      .skill-card .desc {
+        -webkit-line-clamp: 4;
+        min-height: calc(1.4em * 4);
       }
     }
   </style>

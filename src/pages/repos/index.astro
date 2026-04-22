@@ -135,7 +135,7 @@ function formatShortDate(value: string | null): string {
       text-transform: uppercase;
       letter-spacing: 0.12em;
       font-size: 0.8rem;
-      color: #8cd8cd;
+      color: var(--login-eyebrow);
       margin: 0 0 0.4rem;
     }
     h1 {
@@ -160,7 +160,7 @@ function formatShortDate(value: string | null): string {
       border-radius: 12px;
       padding: 0.9rem 1rem;
     }
-    .stat-label { color: #94a3b8; font-size: 0.9rem; display: block; }
+    .stat-label { color: var(--muted); font-size: 0.9rem; display: block; }
     .stat-value { font-weight: 700; font-size: 1.2rem; }
     .hero-card {
       background: color-mix(in srgb, var(--panel-elevated) 74%, transparent);
@@ -175,20 +175,20 @@ function formatShortDate(value: string | null): string {
       width: 100%;
       padding: 0.9rem 1rem;
       border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: #0f172a;
-      color: #e5e7eb;
+      border: 1px solid var(--border);
+      background: var(--input-bg);
+      color: var(--text);
       font-size: 1rem;
     }
-    .search-box input::placeholder { color: #64748b; }
+    .search-box input::placeholder { color: var(--placeholder); }
     .hint { color: var(--muted); margin: 0.5rem 0 0; font-size: 0.9rem; }
     .filter-row { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
     .filter-row select {
       padding: 0.65rem 0.75rem;
       border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: #0f172a;
-      color: #e5e7eb;
+      border: 1px solid var(--border);
+      background: var(--input-bg);
+      color: var(--text);
     }
 
     .repo-section { 
@@ -201,7 +201,7 @@ function formatShortDate(value: string | null): string {
       text-transform: uppercase;
       letter-spacing: 0.12em;
       font-size: 0.8rem;
-      color: #8cd8cd;
+      color: var(--login-eyebrow);
       margin: 0 0 0.4rem;
     }
     .repo-header h2 { 
@@ -235,8 +235,8 @@ function formatShortDate(value: string | null): string {
       transition: background 0.2s, border-color 0.2s;
     }
     .repo-row:hover {
-      background: rgba(255, 255, 255, 0.04);
-      border-color: rgba(255, 255, 255, 0.12);
+      background: color-mix(in srgb, var(--panel-elevated) 86%, transparent);
+      border-color: var(--border-strong);
     }
     .row-main {
       flex: 1;
@@ -247,7 +247,7 @@ function formatShortDate(value: string | null): string {
       font-size: 1.05rem;
     }
     .repo-id { 
-      color: #94a3b8; 
+      color: var(--muted); 
       margin: 0 0 0.3rem; 
       font-size: 0.85rem;
       letter-spacing: 0.05em;
@@ -255,7 +255,7 @@ function formatShortDate(value: string | null): string {
     }
     .repo-desc { 
       margin: 0.4rem 0 0.7rem; 
-      color: #cbd5e1;
+      color: var(--muted);
       font-size: 0.9rem;
       line-height: 1.4;
     }
@@ -268,10 +268,10 @@ function formatShortDate(value: string | null): string {
     .tag {
       padding: 0.2rem 0.7rem;
       border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: #cbd5e1;
+      border: 1px solid var(--border);
+      color: var(--text);
       font-size: 0.82rem;
-      background: rgba(148, 163, 184, 0.1);
+      background: color-mix(in srgb, var(--panel-elevated) 80%, transparent);
       white-space: nowrap;
       display: inline-flex;
       align-items: center;
@@ -289,9 +289,9 @@ function formatShortDate(value: string | null): string {
     .metric {
       padding: 0.2rem 0.7rem;
       border-radius: 999px;
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      background: rgba(56, 189, 248, 0.1);
-      color: #bae6fd;
+      border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
+      color: var(--text);
       font-size: 0.82rem;
       white-space: nowrap;
       display: inline-flex;
@@ -306,7 +306,7 @@ function formatShortDate(value: string | null): string {
       padding-left: 1rem;
     }
     .ghost {
-      color: #a5b4fc;
+      color: var(--action-text);
       text-decoration: none;
       font-weight: 600;
       font-size: 0.95rem;
@@ -315,15 +315,16 @@ function formatShortDate(value: string | null): string {
       display: inline-flex;
       align-items: center;
       transition: all 0.2s;
-      border: 1px solid rgba(165, 180, 252, 0.3);
+      border: 1px solid var(--border-strong);
+      background: var(--action-bg);
     }
     .ghost:hover { 
-      color: #c7d2fe;
-      background: rgba(165, 180, 252, 0.1);
-      border-color: rgba(165, 180, 252, 0.5);
+      color: var(--nav-active-text);
+      background: var(--action-bg-hover);
+      border-color: color-mix(in srgb, var(--accent) 60%, transparent);
     }
-    a { color: #e0f2fe; }
-    a:hover { color: #67e8f9; }
+    a { color: var(--accent); }
+    a:hover { color: var(--link-hover); }
 
     @media (max-width: 800px) {
       .hero { 
