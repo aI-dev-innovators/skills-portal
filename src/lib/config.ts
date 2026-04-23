@@ -29,6 +29,10 @@ export interface RepoConfig {
 const REPOS_CACHE_TTL_MS = 5 * 60 * 1000;
 let reposCache: { expiresAt: number; repos: RepoConfig[] } | null = null;
 
+export function invalidateReposConfigCache(): void {
+  reposCache = null;
+}
+
 /**
  * Lee el catálogo de repos desde Supabase y devuelve la lista registrada.
  *

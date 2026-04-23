@@ -16,6 +16,7 @@ Portal de skills con Astro 5 en modo servidor: lee README y SKILL.md desde GitHu
 - `GITHUB_CLIENT_ID`: Client ID de la GitHub OAuth App.
 - `GITHUB_CLIENT_SECRET`: Client Secret de la GitHub OAuth App.
 - `ALLOWED_EMAIL_DOMAINS`: lista separada por comas de dominios permitidos para login (ej. `example.dominio.pe,dominio.pe`).
+- `REPOSITORY_MANAGER_EMAILS`: lista separada por comas de correos con permiso para crear/editar/eliminar repositorios (ej. `admin@empresa.com,otro@empresa.com`).
 - `BETTER_AUTH_SECRET`: secreto principal de Better Auth (recomendado: 32+ caracteres aleatorios).
 - `BETTER_AUTH_URL`: URL canónica pública para resolver callbacks y cookies de autenticación.
 - `AUTH_SECRET`: fallback compatible si no defines `BETTER_AUTH_SECRET`.
@@ -34,6 +35,7 @@ GITHUB_TOKEN=github_pat_xxx
 GITHUB_CLIENT_ID=Iv1.xxxxxxxxxx
 GITHUB_CLIENT_SECRET=xxxxxxxxxx
 ALLOWED_EMAIL_DOMAINS=example.dominio.pe,dominio.pe
+REPOSITORY_MANAGER_EMAILS=admin@empresa.com,otro@empresa.com
 BETTER_AUTH_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 BETTER_AUTH_URL=https://skills-portal-one.vercel.app
 GITHUB_API_BASE_URL=https://api.github.com
@@ -57,6 +59,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 - Para producción usa: `https://<tu-dominio>/api/auth/callback/github`
 - El acceso a rutas de la plataforma queda protegido por middleware; sin sesión se redirige a `/login/`.
 - Si `ALLOWED_EMAIL_DOMAINS` está definido, solo ingresan usuarios con email de esos dominios.
+- Si `REPOSITORY_MANAGER_EMAILS` está definido, solo esos correos reciben el permiso de gestión de repositorios para futuras rutas de alta/edición/eliminación.
 
 URLs útiles en local:
 

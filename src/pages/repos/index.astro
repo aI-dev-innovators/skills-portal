@@ -4,6 +4,8 @@ import { readReposConfig } from '../../lib/config';
 import { collectAllSkills } from '../../lib/skill.service';
 import { fetchRepoMetrics } from '../../lib/repo.service';
 
+const canManageRepositories = Astro.locals.canManageRepositories ?? false;
+
 const repos = (await readReposConfig()).sort((a, b) => a.name.localeCompare(b.name));
 const totalRepos = repos.length;
 const skills = await collectAllSkills(repos);
@@ -68,6 +70,12 @@ function formatShortDate(value: string | null): string {
       </div>
       <p class="hint">Filtra por texto, tag y estado (con skills / solo README).</p>
       <p class="hint" id="repo-results-count" aria-live="polite">{totalRepos} repos visibles</p>
+      {canManageRepositories && (
+        <div class="admin-actions">
+          <button class="admin-action admin-action--primary" type="button" data-admin-action="create" onclick="handleRepoAdminAction(event)">Agregar repositorio</button>
+          <p class="admin-note">Tu correo tiene permisos de gestión para este catálogo.</p>
+        </div>
+      )}
     </div>
   </section>
 
@@ -109,6 +117,34 @@ function formatShortDate(value: string | null): string {
             </div>
             <div class="row-cta">
               <a class="ghost" href={`/repos/${repo.id}/`}>Ver detalles →</a>
+              {canManageRepositories && (
+                <div class="row-actions">
+                  <button
+                    class="admin-action admin-action--secondary"
+                    type="button"
+                    data-admin-action="edit"
+                    data-repo-id={repo.id}
+                    data-repo-name={repo.name}
+                    data-repo-description={repo.description || ''}
+                    data-repo-url={repo.repoUrl || ''}
+                    data-repo-tags={(repo.tags || []).join(', ')}
+                    onclick="handleRepoAdminAction(event)"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    class="admin-action admin-action--danger"
+                    type="button"
+                    data-admin-action="delete"
+                    data-repo-id={repo.id}
+                    data-repo-name={repo.name}
+                    title="Eliminación pendiente de módulo administrativo"
+                    onclick="handleRepoAdminAction(event)"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              )}
             </div>
           </article>
         );
@@ -182,6 +218,65 @@ function formatShortDate(value: string | null): string {
     }
     .search-box input::placeholder { color: var(--placeholder); }
     .hint { color: var(--muted); margin: 0.5rem 0 0; font-size: 0.9rem; }
+    .admin-actions {
+      margin-top: 0.9rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid var(--border);
+      display: grid;
+      gap: 0.55rem;
+    }
+    .admin-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .admin-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      min-height: 38px;
+      padding: 0.62rem 1rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      text-decoration: none;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(16, 32, 51, 0.08);
+      transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+    }
+    .admin-action:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 28px rgba(16, 32, 51, 0.12);
+    }
+    .admin-action--primary {
+      background: linear-gradient(135deg, rgba(61, 217, 196, 0.28), rgba(255, 180, 84, 0.2));
+      color: var(--text);
+      border-color: rgba(61, 217, 196, 0.35);
+    }
+    .admin-action--primary:hover {
+      background: linear-gradient(135deg, rgba(61, 217, 196, 0.36), rgba(255, 180, 84, 0.26));
+      color: var(--text);
+    }
+    .admin-action--secondary {
+      background: color-mix(in srgb, var(--panel) 84%, transparent);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .admin-action--secondary:hover {
+      background: color-mix(in srgb, var(--panel-elevated) 94%, transparent);
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+    .admin-action--danger {
+      background: rgba(180, 40, 69, 0.12);
+      color: var(--danger);
+      border-color: rgba(180, 40, 69, 0.28);
+    }
+    .admin-action--danger:hover {
+      background: rgba(180, 40, 69, 0.18);
+      color: var(--danger);
+    }
     .filter-row { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
     .filter-row select {
       padding: 0.65rem 0.75rem;
@@ -210,9 +305,9 @@ function formatShortDate(value: string | null): string {
       letter-spacing: -0.02em;
     }
     .repo-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.9rem;
     }
     .repo-empty {
       margin: 0.9rem 0 0;
@@ -225,18 +320,22 @@ function formatShortDate(value: string | null): string {
     }
     .repo-row {
       display: flex;
-      justify-content: space-between;
+      flex-direction: column;
+      justify-content: flex-start;
       align-items: flex-start;
       gap: 1rem;
-      padding: 1rem 1.25rem;
+      padding: 1.05rem 1.1rem;
       background: color-mix(in srgb, var(--panel-elevated) 75%, transparent);
       border: 1px solid var(--border);
       border-radius: 12px;
-      transition: background 0.2s, border-color 0.2s;
+      transition: transform 160ms ease, background 0.2s, border-color 0.2s, box-shadow 160ms ease;
+      min-height: 100%;
     }
     .repo-row:hover {
       background: color-mix(in srgb, var(--panel-elevated) 86%, transparent);
       border-color: var(--border-strong);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-soft);
     }
     .row-main {
       flex: 1;
@@ -301,27 +400,167 @@ function formatShortDate(value: string | null): string {
       line-height: 1;
     }
     .row-cta { 
-      align-self: center;
-      flex-shrink: 0;
-      padding-left: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      margin-top: auto;
+      padding-left: 0;
+      width: 100%;
+    }
+    .row-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
     .ghost {
       color: var(--action-text);
       text-decoration: none;
-      font-weight: 600;
+      font-weight: 700;
       font-size: 0.95rem;
-      padding: 0.5rem 1rem;
-      border-radius: 8px;
+      padding: 0.6rem 1rem;
+      border-radius: 999px;
       display: inline-flex;
       align-items: center;
-      transition: all 0.2s;
+      transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
       border: 1px solid var(--border-strong);
       background: var(--action-bg);
+      box-shadow: 0 10px 24px rgba(16, 32, 51, 0.06);
     }
     .ghost:hover { 
       color: var(--nav-active-text);
       background: var(--action-bg-hover);
       border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+      transform: translateY(-1px);
+    }
+    .admin-modal {
+      width: min(640px, calc(100vw - 2rem));
+      border: none;
+      border-radius: 24px;
+      padding: 0;
+      background: transparent;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+    }
+    .admin-modal::backdrop {
+      background: rgba(4, 12, 22, 0.62);
+      backdrop-filter: blur(4px);
+    }
+    .admin-modal__panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      overflow: hidden;
+    }
+    .admin-modal__header {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: flex-start;
+      padding: 1.2rem 1.2rem 1rem;
+      background: radial-gradient(circle at 0 0, rgba(61, 217, 196, 0.18), transparent 38%),
+        radial-gradient(circle at 100% 0, rgba(255, 180, 84, 0.18), transparent 34%),
+        var(--panel-elevated);
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-modal__eyebrow {
+      margin: 0 0 0.35rem;
+      color: var(--login-eyebrow);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .admin-modal__title {
+      margin: 0;
+      font-size: 1.3rem;
+      letter-spacing: -0.02em;
+    }
+    .admin-modal__subtitle {
+      margin: 0.35rem 0 0;
+      color: var(--muted);
+      line-height: 1.45;
+      max-width: 48ch;
+    }
+    .admin-modal__close {
+      min-width: 38px;
+      min-height: 38px;
+      padding: 0;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--action-bg);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 1.2rem;
+      line-height: 1;
+      box-shadow: none;
+    }
+    .admin-modal__body {
+      display: grid;
+      gap: 1rem;
+      padding: 1.2rem;
+    }
+    .admin-modal__grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.9rem;
+    }
+    .admin-field {
+      display: grid;
+      gap: 0.35rem;
+    }
+    .admin-field--full {
+      grid-column: 1 / -1;
+    }
+    .admin-field label {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .admin-field input,
+    .admin-field textarea {
+      width: 100%;
+      padding: 0.82rem 0.92rem;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--input-bg);
+      color: var(--text);
+    }
+    .admin-field textarea {
+      min-height: 108px;
+      resize: vertical;
+    }
+    .admin-field small {
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .admin-field--toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding-top: 0.35rem;
+    }
+    .admin-field--toggle input {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: var(--accent-strong);
+    }
+    .admin-modal__footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.65rem;
+      flex-wrap: wrap;
+      padding: 0 1.2rem 1.2rem;
+    }
+    .admin-modal__status {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    .admin-modal__submit {
+      min-width: 180px;
     }
     a { color: var(--accent); }
     a:hover { color: var(--link-hover); }
@@ -331,21 +570,97 @@ function formatShortDate(value: string | null): string {
         grid-template-columns: 1fr;
         padding: 1.5rem;
       }
-      .row-cta { 
-        width: 100%; 
-        text-align: right;
-        padding-left: 0;
-        padding-top: 0.5rem;
+      .repo-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
-      .repo-row { 
-        flex-direction: column;
-        padding: 1rem 1.25rem;
+      .row-actions {
+        width: 100%;
+        justify-content: flex-start;
       }
       .repo-desc {
         margin: 0.3rem 0 0.6rem;
       }
+      .admin-modal__grid {
+        grid-template-columns: 1fr;
+      }
+      .admin-modal__footer {
+        justify-content: stretch;
+      }
+      .admin-modal__submit,
+      .admin-modal__footer .ghost {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .repo-list {
+        grid-template-columns: 1fr;
+      }
+
+      .row-cta {
+        justify-content: flex-start;
+      }
     }
   </style>
+
+  {canManageRepositories && (
+    <dialog id="repo-admin-modal" class="admin-modal" aria-labelledby="repo-admin-modal-title">
+      <form id="repo-admin-form" class="admin-modal__panel">
+        <div class="admin-modal__header">
+          <div>
+            <p class="admin-modal__eyebrow">Administración de repos</p>
+            <h3 id="repo-admin-modal-title" class="admin-modal__title">Agregar repositorio</h3>
+            <p class="admin-modal__subtitle">
+              Registra o ajusta la ficha del repositorio sin salir de la pantalla actual.
+            </p>
+          </div>
+          <button class="admin-modal__close" type="button" onclick="closeRepoAdminModal()" aria-label="Cerrar modal">×</button>
+        </div>
+
+        <div class="admin-modal__body">
+          <div class="admin-modal__grid">
+            <label class="admin-field">
+              <span>ID del repositorio</span>
+              <input id="repo-admin-id" name="repository_id" type="text" placeholder="private-skills-cli" required />
+            </label>
+            <label class="admin-field">
+              <span>Nombre visible</span>
+              <input id="repo-admin-name" name="repository_name" type="text" placeholder="private-skills-cli" required />
+            </label>
+            <label class="admin-field admin-field--full">
+              <span>Full name en GitHub</span>
+              <input id="repo-admin-full-name" name="full_name" type="text" placeholder="owner/private-skills-cli" required />
+            </label>
+              <input id="repo-admin-original-id" name="original_repository_id" type="hidden" />
+            <label class="admin-field admin-field--full">
+              <span>URL del repositorio</span>
+              <input id="repo-admin-url" name="github_url" type="url" placeholder="https://github.com/owner/private-skills-cli" required />
+            </label>
+            <label class="admin-field admin-field--full">
+              <span>Descripción</span>
+              <textarea id="repo-admin-description" name="description" placeholder="Describe brevemente el propósito del repositorio"></textarea>
+            </label>
+            <label class="admin-field admin-field--full">
+              <span>Tags</span>
+              <input id="repo-admin-tags" name="tags" type="text" placeholder="angular, frontend, docs" />
+              <small>Separados por coma. Se usarán para organización y filtros.</small>
+            </label>
+            <label class="admin-field admin-field--toggle admin-field--full">
+              <input id="repo-admin-active" name="is_active" type="checkbox" checked />
+              <span>Repositorio activo</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="admin-modal__footer">
+          <p class="admin-modal__status" id="repo-admin-status">Los cambios se prepararán para el módulo de administración.</p>
+          <button class="ghost" type="button" onclick="closeRepoAdminModal()">Cancelar</button>
+          <button class="admin-action admin-action--primary admin-modal__submit" id="repo-admin-submit" type="submit">Agregar repositorio</button>
+        </div>
+      </form>
+    </dialog>
+  )}
 
   <script>
     const list = document.getElementById('repo-list');
@@ -353,6 +668,77 @@ function formatShortDate(value: string | null): string {
     const statusSelect = document.getElementById('repo-status');
     const resultsCount = document.getElementById('repo-results-count');
     const emptyState = document.getElementById('repo-empty-state');
+    const repoAdminModal = document.getElementById('repo-admin-modal') as HTMLDialogElement | null;
+    const repoAdminForm = document.getElementById('repo-admin-form') as HTMLFormElement | null;
+    const repoAdminTitle = document.getElementById('repo-admin-modal-title') as HTMLHeadingElement | null;
+    const repoAdminStatus = document.getElementById('repo-admin-status') as HTMLParagraphElement | null;
+    const repoAdminSubmit = document.getElementById('repo-admin-submit') as HTMLButtonElement | null;
+    const repoAdminId = document.getElementById('repo-admin-id') as HTMLInputElement | null;
+    const repoAdminName = document.getElementById('repo-admin-name') as HTMLInputElement | null;
+    const repoAdminFullName = document.getElementById('repo-admin-full-name') as HTMLInputElement | null;
+    const repoAdminOriginalId = document.getElementById('repo-admin-original-id') as HTMLInputElement | null;
+    const repoAdminUrl = document.getElementById('repo-admin-url') as HTMLInputElement | null;
+    const repoAdminDescription = document.getElementById('repo-admin-description') as HTMLTextAreaElement | null;
+    const repoAdminTags = document.getElementById('repo-admin-tags') as HTMLInputElement | null;
+    const repoAdminActive = document.getElementById('repo-admin-active') as HTMLInputElement | null;
+
+    function setRepoAdminMode(mode: 'create' | 'edit'): void {
+      if (repoAdminForm) {
+        repoAdminForm.dataset.mode = mode;
+      }
+      if (repoAdminTitle) {
+        repoAdminTitle.textContent = mode === 'edit' ? 'Editar repositorio' : 'Agregar repositorio';
+      }
+      if (repoAdminSubmit) {
+        repoAdminSubmit.textContent = mode === 'edit' ? 'Guardar cambios' : 'Agregar repositorio';
+      }
+      if (repoAdminStatus) {
+        repoAdminStatus.textContent = mode === 'edit'
+          ? 'Los cambios se prepararán para el módulo de administración.'
+          : 'Los datos se enviarán al módulo de administración cuando esté conectado.';
+      }
+      if (repoAdminId) {
+        repoAdminId.readOnly = mode === 'edit';
+      }
+    }
+
+    function fillRepoAdminForm(data: {
+      id?: string;
+      name?: string;
+      fullName?: string;
+      url?: string;
+      description?: string;
+      tags?: string;
+      isActive?: boolean;
+    }): void {
+      if (repoAdminId) repoAdminId.value = data.id || '';
+      if (repoAdminOriginalId) repoAdminOriginalId.value = data.id || '';
+      if (repoAdminName) repoAdminName.value = data.name || '';
+      if (repoAdminFullName) repoAdminFullName.value = data.fullName || '';
+      if (repoAdminUrl) repoAdminUrl.value = data.url || '';
+      if (repoAdminDescription) repoAdminDescription.value = data.description || '';
+      if (repoAdminTags) repoAdminTags.value = data.tags || '';
+      if (repoAdminActive) repoAdminActive.checked = data.isActive ?? true;
+    }
+
+    function openRepoAdminModal(mode: 'create' | 'edit', data?: {
+      id?: string;
+      name?: string;
+      fullName?: string;
+      url?: string;
+      description?: string;
+      tags?: string;
+      isActive?: boolean;
+    }): void {
+      if (!repoAdminModal || !repoAdminForm) return;
+      setRepoAdminMode(mode);
+      fillRepoAdminForm(data || {});
+      repoAdminModal.showModal();
+    }
+
+    function closeRepoAdminModal(): void {
+      repoAdminModal?.close();
+    }
 
     function filterRepos() {
       if (!list) return;
@@ -387,8 +773,98 @@ function formatShortDate(value: string | null): string {
 
     filterRepos();
 
+    function handleRepoAdminAction(event: MouseEvent): void {
+      const target = event.currentTarget as HTMLButtonElement | null;
+      const action = target?.dataset?.adminAction;
+      const repoName = target?.dataset?.repoName || 'este repositorio';
+
+      if (action === 'create') {
+        openRepoAdminModal('create');
+        return;
+      }
+
+      if (action === 'edit') {
+        openRepoAdminModal('edit', {
+          id: target?.dataset?.repoId,
+          name: target?.dataset?.repoName,
+          fullName: target?.dataset?.repoUrl ? target.dataset.repoUrl.replace(/^https:\/\/github\.com\//, '') : '',
+          url: target?.dataset?.repoUrl,
+          description: target?.dataset?.repoDescription,
+          tags: target?.dataset?.repoTags,
+          isActive: true
+        });
+        return;
+      }
+
+      if (action === 'delete') {
+        const confirmed = window.confirm(`Eliminar ${repoName} se conectará al módulo de administración. ¿Continuar?`);
+        if (confirmed) {
+          window.alert('Eliminación pendiente de implementación en backend.');
+        }
+      }
+    }
+
+    function handleRepoAdminSubmit(event: SubmitEvent): void {
+      event.preventDefault();
+
+      const form = event.currentTarget as HTMLFormElement | null;
+      if (!form) return;
+
+      const values = new FormData(form);
+      const mode = String(form.dataset.mode || 'create');
+      const repoId = String(values.get('repository_id') || '').trim();
+      const repoName = String(values.get('repository_name') || '').trim();
+      const originalRepositoryId = String(values.get('original_repository_id') || '').trim();
+
+      const payload = {
+        action: mode,
+        original_repository_id: originalRepositoryId,
+        repository_id: repoId,
+        repository_name: repoName,
+        full_name: String(values.get('full_name') || '').trim(),
+        github_url: String(values.get('github_url') || '').trim(),
+        description: String(values.get('description') || '').trim(),
+        tags: String(values.get('tags') || '').trim(),
+        is_active: values.get('is_active') === 'on'
+      };
+
+      repoAdminStatus && (repoAdminStatus.textContent = 'Guardando cambios...');
+
+      fetch('/api/admin/repositories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(String((data as { error?: string }).error || 'No se pudo guardar el repositorio'));
+          }
+          window.location.reload();
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : 'Error inesperado';
+          if (repoAdminStatus) {
+            repoAdminStatus.textContent = message;
+          }
+        });
+    }
+
+    repoAdminForm?.addEventListener('submit', handleRepoAdminSubmit);
+    repoAdminModal?.addEventListener('click', (event: MouseEvent) => {
+      if (event.target === repoAdminModal) {
+        closeRepoAdminModal();
+      }
+    });
+
     // Exponer función para el oninput inline.
     // @ts-ignore
     window.filterRepos = filterRepos;
+    // @ts-ignore
+    window.openRepoAdminModal = openRepoAdminModal;
+    // @ts-ignore
+    window.closeRepoAdminModal = closeRepoAdminModal;
+    // @ts-ignore
+    window.handleRepoAdminAction = handleRepoAdminAction;
   </script>
 </Layout>

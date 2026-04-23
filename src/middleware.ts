@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'astro';
-import { auth, isAllowedEmailDomain } from './lib/auth';
+import { auth, canManageRepositories, isAllowedEmailDomain } from './lib/auth';
 
 const authDebugEnabled =
   (import.meta.env.AUTH_DEBUG_LOGS || process.env.AUTH_DEBUG_LOGS || '').toLowerCase() === 'true';
@@ -56,6 +56,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
 
   context.locals.user = sessionData?.user ?? null;
   context.locals.session = sessionData?.session ?? null;
+  context.locals.canManageRepositories = canManageRepositories(sessionData?.user?.email);
 
   const hasAllowedDomain = isAllowedEmailDomain(sessionData?.user?.email);
 

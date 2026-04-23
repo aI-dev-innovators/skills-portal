@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import type { AnalyticsEventInput } from '../../../lib/services/types';
 import { upsertUser } from '../../../lib/services/users';
-import { upsertRepository } from '../../../lib/services/repositories';
+import { getRepositoryById } from '../../../lib/services/repositories';
 import { upsertSkill } from '../../../lib/services/skills';
 import {
   insertLoginEvent,
@@ -143,14 +143,13 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
 
       if (event.type === 'repository_view') {
-        await upsertRepository({
-          repository_id: event.payload.repositoryId,
-          repository_name: event.payload.repositoryName || event.payload.repositoryId,
-          full_name: event.payload.fullName || event.payload.repositoryName || event.payload.repositoryId,
-          github_url: event.payload.githubUrl || '',
-          description: event.payload.description || null,
-          is_active: true
-        });
+        const repository = await getRepositoryById(event.payload.repositoryId);
+
+        if (!repository) {
+          console.warn('[analytics-ingest] repository_view skipped because repository does not exist', summarizeEvent(event));
+          skippedDuplicates += 1;
+          continue;
+        }
 
         const result = await insertRepositoryView({
           user_id: resolvedUserId,
@@ -167,14 +166,13 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
 
       if (event.type === 'skill_view') {
-        await upsertRepository({
-          repository_id: event.payload.repositoryId,
-          repository_name: event.payload.repositoryName || event.payload.repositoryId,
-          full_name: event.payload.fullName || event.payload.repositoryName || event.payload.repositoryId,
-          github_url: event.payload.githubUrl || '',
-          description: null,
-          is_active: true
-        });
+        const repository = await getRepositoryById(event.payload.repositoryId);
+
+        if (!repository) {
+          console.warn('[analytics-ingest] skill_view skipped because repository does not exist', summarizeEvent(event));
+          skippedDuplicates += 1;
+          continue;
+        }
 
         await upsertSkill({
           skill_id: event.payload.skillId,
@@ -201,14 +199,13 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
 
       if (event.type === 'skill_feedback') {
-        await upsertRepository({
-          repository_id: event.payload.repositoryId,
-          repository_name: event.payload.repositoryName || event.payload.repositoryId,
-          full_name: event.payload.fullName || event.payload.repositoryName || event.payload.repositoryId,
-          github_url: event.payload.githubUrl || '',
-          description: event.payload.description || null,
-          is_active: true
-        });
+        const repository = await getRepositoryById(event.payload.repositoryId);
+
+        if (!repository) {
+          console.warn('[analytics-ingest] skill_feedback skipped because repository does not exist', summarizeEvent(event));
+          skippedDuplicates += 1;
+          continue;
+        }
 
         await upsertSkill({
           skill_id: event.payload.skillId,

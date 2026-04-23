@@ -3,9 +3,11 @@ import matter from 'gray-matter';
 import { RepoConfig } from './config';
 import { buildContentsUrl, fetchJson, fetchRepositoryFileText, GitHubContentEntry } from './github.service';
 import { getRepoContext, RepoContext, fetchRepoMetrics } from './repo.service';
+import { getServerSupabaseClient } from './db/supabase';
 import type { BadgeType } from './badge.service';
 import { generateBadges } from './badge.service';
 import { calculateSkillScore } from './ranking.service';
+import { logSupabaseError } from './services/supabase-errors';
 
 type SkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
 type SkillStatus = 'draft' | 'stable' | 'recommended' | 'deprecated';
@@ -88,6 +90,35 @@ const SKILLS_TTL_MS = 5 * 60 * 1000;
 /** Cache en memoria de skills por id de repositorio. */
 const skillsCache = new Map<string, { expiresAt: number; skills: SkillDoc[] }>();
 
+interface SkillCatalogEntryRecord {
+  skill_id: string;
+  repository_id: string;
+  skill_name: string;
+  title: string;
+  description: string;
+  tags: string[];
+  repo_name: string;
+  source_path: string;
+  url: string;
+  content: string;
+  frameworks: string[];
+  test_types: string[];
+  level: SkillLevel;
+  status: SkillStatus;
+  version: string;
+  estimated_time: number | null;
+  has_examples: boolean;
+  has_templates: boolean;
+  has_evals: boolean;
+  has_scripts: boolean;
+  recommended_commands: string[];
+  badges: string[];
+  score: number;
+  repo_stars: number;
+  last_updated: string | null;
+  is_active?: boolean;
+}
+
 /**
  * Elimina propiedades con valor undefined en un objeto plano.
  *
@@ -112,6 +143,37 @@ function toStringArray(value: unknown, lowerCase = true): string[] {
       const normalized = entry.trim();
       return lowerCase ? normalized.toLowerCase() : normalized;
     });
+}
+
+function toPlainString(value: unknown, fallback = ''): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return fallback;
+}
+
+function toNullableString(value: unknown): string | null {
+  const normalized = toPlainString(value).trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function toBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
 }
 
 function toSkillLevel(value: unknown): SkillLevel {
@@ -164,6 +226,112 @@ function inferTestTypes(tags: string[]): string[] {
     known.push('unit');
   }
   return unique(known.length ? known : ['unit']);
+}
+
+function skillCatalogCacheKey(repositoryId: string): string {
+  return `skill-catalog:${repositoryId}`;
+}
+
+function buildSkillPortalUrl(repo: RepoConfig, skillId: string, skillName: string): string {
+  const query = new URLSearchParams({
+    repo: repo.repoUrl,
+    skill: skillName
+  });
+
+  return `/skills/${skillId}/?${query.toString()}`;
+}
+
+function serializeSkillDoc(skill: SkillDoc): SkillCatalogEntryRecord {
+  return {
+    skill_id: skill.id,
+    repository_id: skill.repoId,
+    skill_name: skill.name,
+    title: skill.title,
+    description: skill.description,
+    tags: skill.tags,
+    repo_name: skill.repoName,
+    source_path: skill.sourcePath,
+    url: skill.url,
+    content: skill.content,
+    frameworks: skill.frameworks,
+    test_types: skill.testTypes,
+    level: skill.level,
+    status: skill.status,
+    version: skill.version,
+    estimated_time: skill.estimatedTime,
+    has_examples: skill.hasExamples,
+    has_templates: skill.hasTemplates,
+    has_evals: skill.hasEvals,
+    has_scripts: skill.hasScripts,
+    recommended_commands: skill.recommendedCommands,
+    badges: skill.badges,
+    score: skill.score,
+    repo_stars: skill.repoStars,
+    last_updated: skill.lastUpdated,
+    is_active: true
+  };
+}
+
+function deserializeSkillDoc(record: SkillCatalogEntryRecord): SkillDoc {
+  return {
+    id: toPlainString(record.skill_id),
+    title: toPlainString(record.title),
+    description: toPlainString(record.description),
+    tags: toStringArray(record.tags, false),
+    repoId: toPlainString(record.repository_id),
+    name: toPlainString(record.skill_name),
+    repoName: toPlainString(record.repo_name),
+    url: toPlainString(record.url),
+    content: toPlainString(record.content),
+    sourcePath: toPlainString(record.source_path),
+    frameworks: toStringArray(record.frameworks),
+    testTypes: toStringArray(record.test_types),
+    level: toSkillLevel(record.level),
+    status: toSkillStatus(record.status),
+    version: toPlainString(record.version, '1.0.0'),
+    estimatedTime: record.estimated_time ?? null,
+    hasExamples: toBoolean(record.has_examples),
+    hasTemplates: toBoolean(record.has_templates),
+    hasEvals: toBoolean(record.has_evals),
+    hasScripts: toBoolean(record.has_scripts),
+    recommendedCommands: toStringArray(record.recommended_commands, false),
+    badges: toStringArray(record.badges, false) as BadgeType[],
+    score: toNumber(record.score),
+    repoStars: toNumber(record.repo_stars),
+    lastUpdated: toNullableString(record.last_updated)
+  };
+}
+
+async function readCachedSkillsFromDatabase(repo: RepoConfig): Promise<SkillDoc[] | null> {
+  const supabase = getServerSupabaseClient();
+  const { data, error } = await supabase
+    .from('skill_catalog_entries')
+    .select('*')
+    .eq('repository_id', repo.id)
+    .eq('is_active', true)
+    .order('skill_name', { ascending: true });
+
+  if (error) {
+    if (error.code === '42P01' || error.code === 'PGRST205') return null;
+    logSupabaseError({ operation: 'readCachedSkillsFromDatabase', table: 'skill_catalog_entries', payload: { repositoryId: repo.id } }, error);
+    return null;
+  }
+
+  if (!data?.length) return null;
+  return (data as SkillCatalogEntryRecord[]).map(deserializeSkillDoc);
+}
+
+async function persistSkillsToDatabase(repo: RepoConfig, skills: SkillDoc[]): Promise<void> {
+  if (skills.length === 0) return;
+
+  const supabase = getServerSupabaseClient();
+  const payload = skills.map((skill) => serializeSkillDoc(skill));
+  const { error } = await supabase.from('skill_catalog_entries').upsert(payload, { onConflict: 'skill_id' });
+
+  if (error) {
+    if (error.code === '42P01' || error.code === 'PGRST205') return;
+    logSupabaseError({ operation: 'persistSkillsToDatabase', table: 'skill_catalog_entries', payload: { repositoryId: repo.id, count: skills.length } }, error);
+  }
 }
 
 /**
@@ -303,6 +471,12 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
     return cacheHit.skills;
   }
 
+  const cachedSkills = await readCachedSkillsFromDatabase(repo);
+  if (cachedSkills && cachedSkills.length > 0) {
+    skillsCache.set(repo.id, { skills: cachedSkills, expiresAt: Date.now() + SKILLS_TTL_MS });
+    return cachedSkills;
+  }
+
   const context = await getRepoContext(repo);
   if (!context) {
     console.error(`[skills:${repo.id}] No se pudo resolver metadata del repo.`);
@@ -366,7 +540,7 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
       tags: (frontmatter.tags as string[]) || [],
       repoId: repo.id,
       repoName: repo.name,
-      url: `/skills/${skillId}/`,
+      url: buildSkillPortalUrl(repo, skillId, baseValue),
       content: parsed.content,
       sourcePath: filePath,
       frameworks,
@@ -402,6 +576,7 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
 
   const cleanSkills = skills.filter((skill): skill is SkillDoc => Boolean(skill));
   skillsCache.set(repo.id, { skills: cleanSkills, expiresAt: Date.now() + SKILLS_TTL_MS });
+  await persistSkillsToDatabase(repo, cleanSkills);
   return cleanSkills;
 }
 

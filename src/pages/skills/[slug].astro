@@ -49,6 +49,19 @@ const installSingleSkillCommand = sourceRepo
 const repoWebUrl = repoContext
   ? `https://github.com/${repoContext.slug.owner}/${repoContext.slug.name}`
   : null;
+const repoDetailUrl = sourceRepo ? `/repos/${sourceRepo.id}/` : null;
+const skillPortalUrl = skill.url;
+
+const skillHighlights = [
+  skill.hasExamples ? 'Examples' : null,
+  skill.hasTemplates ? 'Templates' : null,
+  skill.hasEvals ? 'Evals' : null,
+  skill.hasScripts ? 'Scripts' : null
+].filter((item): item is string => Boolean(item));
+
+const skillContentSummary = skillHighlights.length > 0
+  ? skillHighlights.join(' · ')
+  : 'Contenido orientado a documentación y uso directo.';
 
 let skillReadmeOrSkillContent = skill.content;
 let skillReadmeOrSkillPath = skill.sourcePath;
@@ -91,7 +104,7 @@ const skillFileWebUrl = repoContext
     <div class="skill-hero-main">
       <p class="badge">{skill.repoName || skill.repoId || 'Repositorio'}</p>
       <h1>{skill.title}</h1>
-      <p>{skill.description}</p>
+      <p class="hero-description">{skill.description}</p>
       {skill.tags.length > 0 && (
         <div class="tag-wrap">
           {skill.tags.map((tag) => (
@@ -99,24 +112,32 @@ const skillFileWebUrl = repoContext
           ))}
         </div>
       )}
+      <div class="hero-summary-grid" aria-label="Resumen de la skill">
+        <article class="summary-card">
+          <span class="summary-label">Nivel</span>
+          <strong>{skill.level}</strong>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label">Estado</span>
+          <strong>{skill.status}</strong>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label">Versión</span>
+          <strong>{skill.version}</strong>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label">Tiempo</span>
+          <strong>{typeof skill.estimatedTime === 'number' ? `${skill.estimatedTime} min` : 'Sin estimar'}</strong>
+        </article>
+      </div>
       <div class="meta-pills">
-        <span class="meta-pill"><strong>Nivel</strong>{skill.level}</span>
-        <span class="meta-pill"><strong>Estado</strong>{skill.status}</span>
-        <span class="meta-pill"><strong>Version</strong>{skill.version}</span>
-        {typeof skill.estimatedTime === 'number' && (
-          <span class="meta-pill"><strong>Tiempo</strong>{skill.estimatedTime} min</span>
-        )}
-        {skill.frameworks.length > 0 && (
-          <span class="meta-pill"><strong>Frameworks</strong>{skill.frameworks.join(', ')}</span>
-        )}
-        {skill.testTypes.length > 0 && (
-          <span class="meta-pill"><strong>Tests</strong>{skill.testTypes.join(', ')}</span>
-        )}
+        {skill.frameworks.length > 0 && <span class="meta-pill"><strong>Frameworks</strong>{skill.frameworks.join(', ')}</span>}
+        {skill.testTypes.length > 0 && <span class="meta-pill"><strong>Tests</strong>{skill.testTypes.join(', ')}</span>}
       </div>
     </div>
     <aside class="skill-hero-panel">
       {(skill.hasExamples || skill.hasTemplates || skill.hasEvals || skill.hasScripts) && (
-        <div class="asset-wrap">
+        <div class="asset-wrap panel-section">
           {skill.hasExamples && <span class="asset">Examples</span>}
           {skill.hasTemplates && <span class="asset">Templates</span>}
           {skill.hasEvals && <span class="asset">Evals</span>}
@@ -124,7 +145,7 @@ const skillFileWebUrl = repoContext
         </div>
       )}
       {installSingleSkillCommand && (
-        <div class="cmd-wrap cmd-install-wrap">
+        <div class="cmd-wrap cmd-install-wrap panel-section">
           <strong>Instalar solo esta skill</strong>
           <div class="install-command-box">
             <code id="install-skill-command">{installSingleSkillCommand}</code>
@@ -142,20 +163,29 @@ const skillFileWebUrl = repoContext
         </div>
       )}
       {(repoWebUrl || skillFileWebUrl) && (
-        <div class="link-wrap">
-          <strong>Repositorio</strong>
+        <div class="link-wrap panel-section">
+          <strong>Accesos</strong>
           <div class="repo-links">
-            {repoWebUrl && (
-              <a href={repoWebUrl} target="_blank" rel="noreferrer noopener">Ver repositorio</a>
+            {repoDetailUrl && (
+              <a class="link-button link-button--primary" href={repoDetailUrl}>
+                Ver repositorio
+              </a>
             )}
-            {skillFileWebUrl && (
-              <a href={skillFileWebUrl} target="_blank" rel="noreferrer noopener">Ver skill</a>
+            {skillPortalUrl && (
+              <a class="link-button link-button--secondary" href={skillPortalUrl}>
+                Ver skill
+              </a>
             )}
           </div>
+          {skillFileWebUrl && (
+            <a class="link-note" href={skillFileWebUrl} target="_blank" rel="noreferrer noopener">
+              Abrir archivo fuente
+            </a>
+          )}
         </div>
       )}
       {skill.recommendedCommands.length > 0 && (
-        <details class="cmd-wrap cmd-details">
+        <details class="cmd-wrap cmd-details panel-section">
           <summary>Comandos sugeridos</summary>
           <ul>
             {skill.recommendedCommands.map((command) => (
@@ -166,33 +196,41 @@ const skillFileWebUrl = repoContext
       )}
     </aside>
   </section>
-  <section class="skill-doc-head">
-    <p class="badge">Contenido de skill</p>
-    <h2>{skillReadmeSourceLabel}</h2>
-    <p>Se muestra {skillReadmeSourceLabel === 'README.md' ? 'README.md' : 'SKILL.md'} del repositorio.</p>
-  </section>
-  <section class="telemetry-panel">
-    <strong>¿Te sirvió esta skill?</strong>
-    <div class="vote-row" id="helpful-vote-actions">
-      <button type="button" class="vote-button" data-vote="helpful">Sí</button>
-      <button type="button" class="vote-button" data-vote="not-helpful">No</button>
+  <section class="content-layout">
+    <div class="content-column">
+      <article class="skill-content-card">
+        <div class="content-intro">
+          <p class="content-label">Contenido de skill</p>
+          <div class="content-title-row">
+            <h2>{skillReadmeSourceLabel}</h2>
+            <span class="content-source">{skillReadmeSourceLabel === 'README.md' ? 'README.md' : 'SKILL.md'} del repositorio</span>
+          </div>
+        </div>
+        <div class="skill-content" set:html={skillDocHtml}></div>
+      </article>
     </div>
-    <label class="feedback-label" for="skill-suggestion-input">¿Qué mejorarías o qué faltó?</label>
-    <textarea
-      class="feedback-input"
-      id="skill-suggestion-input"
-      rows="3"
-      maxlength="500"
-      placeholder="Escribe una sugerencia breve..."
-    ></textarea>
-    <div class="feedback-actions">
-      <button type="button" class="feedback-submit-button" id="submit-suggestion-button">Enviar sugerencia</button>
-    </div>
-    <p class="telemetry-meta" id="skill-view-meta">Sin vistas registradas todavía.</p>
-    <p class="telemetry-meta" id="skill-vote-meta">Aún no hay votos.</p>
-    <p class="telemetry-meta" id="skill-feedback-meta">Tu opinión ayuda a mejorar esta skill.</p>
+    <section class="telemetry-panel secondary-card">
+      <strong>¿Te sirvió esta skill?</strong>
+      <div class="vote-row" id="helpful-vote-actions">
+        <button type="button" class="vote-button" data-vote="helpful">Sí</button>
+        <button type="button" class="vote-button" data-vote="not-helpful">No</button>
+      </div>
+      <label class="feedback-label" for="skill-suggestion-input">¿Qué mejorarías o qué faltó?</label>
+      <textarea
+        class="feedback-input"
+        id="skill-suggestion-input"
+        rows="3"
+        maxlength="500"
+        placeholder="Escribe una sugerencia breve..."
+      ></textarea>
+      <div class="feedback-actions">
+        <button type="button" class="feedback-submit-button" id="submit-suggestion-button">Enviar sugerencia</button>
+      </div>
+      <p class="telemetry-meta" id="skill-view-meta">Sin vistas registradas todavía.</p>
+      <p class="telemetry-meta" id="skill-vote-meta">Aún no hay votos.</p>
+      <p class="telemetry-meta" id="skill-feedback-meta">Tu opinión ayuda a mejorar esta skill.</p>
+    </section>
   </section>
-  <div class="skill-content" set:html={skillDocHtml}></div>
   <section class="recommend-section">
     <div class="recommend-head">
       <p class="badge">Personalización ligera</p>
@@ -223,6 +261,10 @@ const skillFileWebUrl = repoContext
       display: grid;
       gap: 0.45rem;
     }
+    .hero-description {
+      max-width: 72ch;
+      line-height: 1.55;
+    }
     .skill-hero h1 {
       margin: 0.1rem 0;
       letter-spacing: -0.01em;
@@ -240,8 +282,34 @@ const skillFileWebUrl = repoContext
     }
     .skill-hero .badge + .badge { margin-left: 0.3rem; }
     .tag-wrap { margin-top: 0.45rem; }
+    .hero-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.55rem;
+    }
+    .summary-card {
+      padding: 0.65rem 0.75rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel-elevated) 82%, transparent);
+      display: grid;
+      gap: 0.12rem;
+    }
+    .summary-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--login-eyebrow);
+      font-weight: 700;
+    }
+    .summary-card strong {
+      font-size: 0.98rem;
+      color: var(--text);
+      line-height: 1.25;
+      word-break: break-word;
+    }
     .meta-pills {
-      margin-top: 0.15rem;
+      margin-top: 0.1rem;
       display: flex;
       flex-wrap: wrap;
       gap: 0.45rem;
@@ -268,18 +336,94 @@ const skillFileWebUrl = repoContext
     .skill-hero-panel {
       min-width: 280px;
       max-width: 360px;
-      padding: 0.75rem;
-      border-radius: 12px;
+      padding: 0.85rem;
+      border-radius: 16px;
       border: 1px solid var(--border);
       background: color-mix(in srgb, var(--panel-elevated) 82%, transparent);
       display: grid;
-      gap: 0.55rem;
+      gap: 0.7rem;
+      align-content: start;
+    }
+    .panel-section {
+      display: grid;
+      gap: 0.35rem;
+      padding: 0.75rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel) 78%, transparent);
+    }
+    .panel-section > strong {
+      font-size: 0.9rem;
+    }
+    .panel-section > p {
+      font-size: 0.84rem;
+      line-height: 1.45;
     }
     .asset-wrap {
       display: flex;
       flex-wrap: wrap;
       gap: 0.3rem;
-      margin-top: 0.2rem;
+      margin-top: 0;
+    }
+    .content-layout {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+      gap: 0.85rem;
+      align-items: start;
+    }
+    .content-layout > * {
+      min-width: 0;
+    }
+    .content-column {
+      display: grid;
+      gap: 0.75rem;
+      min-width: 0;
+    }
+    .skill-content-card {
+      display: grid;
+      gap: 0.85rem;
+      padding: 1rem;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel-elevated) 80%, transparent);
+      min-width: 0;
+    }
+    .content-intro {
+      display: grid;
+      gap: 0.2rem;
+    }
+    .content-label {
+      margin: 0;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--login-eyebrow);
+      font-weight: 700;
+    }
+    .content-title-row {
+      display: flex;
+      gap: 0.65rem;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+    .content-title-row h2 {
+      margin: 0;
+    }
+    .content-source {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    .skill-content-card .skill-content {
+      margin-top: 0;
+      padding: 1.1rem 1.15rem;
+      background: color-mix(in srgb, var(--panel) 82%, transparent);
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .content-intro p {
+      margin: 0;
+      color: var(--muted);
     }
     .asset {
       font-size: 0.8rem;
@@ -379,29 +523,60 @@ const skillFileWebUrl = repoContext
       flex-wrap: wrap;
       gap: 0.5rem;
     }
-    .repo-links a {
+    .link-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
       color: var(--accent);
       text-decoration: none;
       font-size: 0.88rem;
       border: 1px solid var(--border-strong);
       background: var(--action-bg);
       border-radius: 999px;
-      padding: 0.2rem 0.55rem;
+      padding: 0.34rem 0.7rem;
+      min-height: 2rem;
+      line-height: 1;
+      font-weight: 700;
+      transition: background 120ms ease, transform 120ms ease, border-color 120ms ease;
+    }
+    .link-button:hover {
+      background: var(--action-bg-hover);
+      border-color: rgba(61, 217, 196, 0.55);
+      transform: translateY(-1px);
+    }
+    .link-button--primary {
+      background: color-mix(in srgb, var(--accent) 12%, var(--action-bg));
+      border-color: color-mix(in srgb, var(--accent) 42%, var(--border-strong));
+      color: var(--text);
+    }
+    .link-button--secondary {
+      background: var(--action-bg);
+      color: var(--action-text);
+    }
+    .link-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.8rem;
     }
     .telemetry-panel {
-      margin-top: 0.8rem;
-      margin-bottom: 0.75rem;
-      padding: 0.8rem;
-      border-radius: 12px;
+      margin-top: 0;
+      margin-bottom: 0;
+      padding: 0.95rem;
+      border-radius: 16px;
       border: 1px solid var(--border);
       background: color-mix(in srgb, var(--panel-elevated) 82%, transparent);
       display: grid;
       gap: 0.42rem;
     }
-    .skill-doc-head {
-      margin-top: 1.1rem;
-      display: grid;
-      gap: 0.2rem;
+    .secondary-card {
+      padding: 1rem;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel-elevated) 80%, transparent);
+    }
+    .secondary-card--wide {
+      min-width: 0;
     }
     .skill-doc-head h2 {
       margin: 0;
@@ -518,22 +693,49 @@ const skillFileWebUrl = repoContext
       margin: 0;
       color: var(--muted);
     }
-    @media (max-width: 900px) {
+    .skill-content-card :global(h1) {
+      margin-top: 0.2rem;
+      margin-bottom: 0.85rem;
+    }
+    .skill-content-card :global(h2) {
+      margin-top: 1.3rem;
+      margin-bottom: 0.6rem;
+    }
+    .skill-content-card :global(h3) {
+      margin-top: 1.1rem;
+      margin-bottom: 0.5rem;
+    }
+    .skill-content-card :global(p) {
+      margin-bottom: 0.9rem;
+    }
+    .skill-content-card :global(ul),
+    .skill-content-card :global(ol) {
+      margin-bottom: 1rem;
+    }
+    .skill-content-card :global(blockquote) {
+      margin: 0 0 1rem;
+      padding: 0.85rem 0.95rem;
+      border-left: 3px solid var(--accent);
+      background: color-mix(in srgb, var(--panel-elevated) 68%, transparent);
+      border-radius: 10px;
+    }
+    @media (max-width: 1040px) {
       .skill-hero { flex-direction: column; }
       .skill-hero-panel {
         width: 100%;
         max-width: none;
       }
-      .meta-pill {
-        width: 100%;
-        justify-content: space-between;
-      }
+      .hero-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .content-layout { grid-template-columns: 1fr; }
       .install-command-box {
         grid-template-columns: 1fr;
       }
       .copy-command-button {
         justify-self: start;
       }
+    }
+    @media (max-width: 560px) {
+      .hero-summary-grid { grid-template-columns: 1fr; }
     }
     .skill-content { margin-top: 0.75rem; }
   </style>

@@ -6,6 +6,11 @@ const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS || '')
   .map((domain) => domain.trim().toLowerCase().replace(/^@/, ''))
   .filter(Boolean);
 
+const allowedRepositoryManagerEmails = (process.env.REPOSITORY_MANAGER_EMAILS || '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
 const runtimeFallbackUrl =
   (process.env.VERCEL_PROJECT_PRODUCTION_URL
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
@@ -25,6 +30,12 @@ export function isAllowedEmailDomain(email?: string | null): boolean {
   const domain = email.split('@')[1]?.toLowerCase();
   if (!domain) return false;
   return allowedDomains.includes(domain);
+}
+
+export function canManageRepositories(email?: string | null): boolean {
+  if (!email) return false;
+  if (allowedRepositoryManagerEmails.length === 0) return false;
+  return allowedRepositoryManagerEmails.includes(email.trim().toLowerCase());
 }
 
 export const auth = betterAuth({

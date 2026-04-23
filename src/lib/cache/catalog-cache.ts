@@ -48,3 +48,11 @@ export function setCatalogCache<T>(key: string, value: T, ttlMs: number): void {
 export function invalidateCatalogCache(key: string): void {
   cache.delete(key);
 }
+
+export function invalidateCatalogByPrefix(prefix: string): void {
+  for (const key of (cache as unknown as { values?: Map<string, CacheValue<unknown>> }).values?.keys?.() || []) {
+    if (key.startsWith(prefix)) {
+      cache.delete(key);
+    }
+  }
+}
