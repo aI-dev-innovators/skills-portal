@@ -45,7 +45,8 @@ type TelemetrySessionOptions =
     };
 
 type TelemetrySkillFeedback = {
-  skillId: string;
+  skillId?: string;
+  id?: string;
   title: string;
   repoId?: string;
   repoName?: string;
@@ -320,10 +321,13 @@ export function trackSkillFeedback(
   const suggestion = input.suggestion?.trim();
   if (!input.helpfulVote && !suggestion) return;
 
+  const skillId = profile.skillId || profile.id;
+  if (!skillId) return;
+
   enqueueMetricEvent({
     type: 'skill_feedback',
     payload: {
-      skillId: profile.skillId,
+      skillId,
       skillName: profile.title,
       repositoryId: profile.repoId || profile.repoName || 'unknown-repository',
       repositoryName: profile.repoName,

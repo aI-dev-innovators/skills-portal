@@ -207,6 +207,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
           continue;
         }
 
+        if (!event.payload.skillId) {
+          console.warn('[analytics-ingest] skill_feedback skipped because skillId is missing', summarizeEvent(event));
+          skippedDuplicates += 1;
+          continue;
+        }
+
         await upsertSkill({
           skill_id: event.payload.skillId,
           skill_name: event.payload.skillName || event.payload.skillId,
