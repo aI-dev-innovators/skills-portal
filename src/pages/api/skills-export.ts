@@ -13,7 +13,7 @@ function toBrowserRepoUrl(repoUrl: string): string {
 
 export const GET: APIRoute = async () => {
   requireToken();
-  const repos = readReposConfig();
+  const repos = await readReposConfig();
   const skills = (await collectAllSkills(repos)).sort((a, b) => a.title.localeCompare(b.title));
 
   const contextEntries = await Promise.all(

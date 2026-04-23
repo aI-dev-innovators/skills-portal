@@ -7,7 +7,7 @@ import { mdToHtml } from '../../lib/markdown';
 
 export async function getStaticPaths() {
   requireToken();
-  const repos = readReposConfig();
+  const repos = await readReposConfig();
   return repos.map((repo) => ({ params: { id: repo.id } }));
 }
 
@@ -15,7 +15,7 @@ const { id } = Astro.params;
 if (!id) throw new Error('Repo ID requerido');
 
 requireToken();
-const repos = readReposConfig();
+const repos = await readReposConfig();
 const repo = repos.find((r) => r.id === id);
 
 if (!repo) {
@@ -25,12 +25,13 @@ if (!repo) {
 const readme = (await fetchReadme(repo)) || '# README no encontrado';
 const html = mdToHtml(readme);
 const metrics = await fetchRepoMetrics(repo);
+const repoSlug = parseRepoSlug(repo.repoUrl || '');
 // Normaliza la URL del repo a vista web para el CTA.
 const repoWebUrl = (() => {
-  const slug = parseRepoSlug(repo.repoUrl || '');
-  if (slug) return `https://github.com/${slug.owner}/${slug.name}`;
+  if (repoSlug) return `https://github.com/${repoSlug.owner}/${repoSlug.name}`;
   return repo.repoUrl;
 })();
+const repoFullName = repoSlug ? `${repoSlug.owner}/${repoSlug.name}` : repo.name;
 
 const formattedCommitDate = (() => {
   if (!metrics.lastCommitDate) return 'Sin datos';
@@ -114,4 +115,30 @@ const formattedCommitDate = (() => {
     .external:hover { color: var(--accent-strong); }
     .repo-content { margin-top: 1.25rem; }
   </style>
+
+  <script>
+    import { startTelemetrySession } from '../../lib/client-telemetry';
+
+    const repoProfile = JSON.parse(document.getElementById('repo-profile-json')?.textContent || '{}');
+    startTelemetrySession({
+      type: 'repository_view',
+      payload: {
+        repositoryId: repoProfile.id || 'unknown-repository',
+        repositoryName: repoProfile.name,
+        fullName: repoProfile.fullName,
+        githubUrl: repoProfile.githubUrl,
+        description: repoProfile.description,
+        sourcePage: '/repos'
+      },
+      intervalMs: 30_000,
+      initialDelayMs: 10_000
+    });
+  </script>
+  <script is:inline id="repo-profile-json" type="application/json" set:html={JSON.stringify({
+    id: repo.id,
+    name: repo.name,
+    fullName: repoFullName,
+    githubUrl: repoWebUrl,
+    description: repo.description || ''
+  })}></script>
 </Layout>

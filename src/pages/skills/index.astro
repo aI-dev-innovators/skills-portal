@@ -6,7 +6,7 @@ import { collectAllSkills } from '../../lib/skill.service';
 import { getBadgeDefinition } from '../../lib/badge.service';
 
 requireToken();
-const repos = readReposConfig();
+const repos = await readReposConfig();
 const skills = (await collectAllSkills(repos)).sort((a, b) => a.title.localeCompare(b.title));
 
 const repoOptions = Array.from(new Set(skills.map((s) => s.repoName || s.repoId))).sort();

@@ -98,9 +98,10 @@ function isActivePath(href: string): boolean {
     </div>
 
     <script>
-      import { trackLinkClick } from '../lib/client-telemetry';
+      import { trackLinkClick, trackLoginEvent } from '../lib/client-telemetry';
       const { signOut } = await import('../lib/auth-client');
       const themeStorageKey = 'skills-portal-theme';
+      const loginMetricKey = 'skills-portal.login-metric.sent';
 
       // Preloader para transiciones de página y clics en navegación.
       const loader = document.getElementById('page-loader');
@@ -142,6 +143,15 @@ function isActivePath(href: string): boolean {
       };
 
       applyTheme(getInitialTheme());
+
+      try {
+        if (!sessionStorage.getItem(loginMetricKey)) {
+          trackLoginEvent();
+          sessionStorage.setItem(loginMetricKey, '1');
+        }
+      } catch {
+        trackLoginEvent();
+      }
 
       themeToggle?.addEventListener('click', () => {
         const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';

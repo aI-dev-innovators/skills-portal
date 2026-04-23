@@ -9,7 +9,7 @@ import { getRepoContext } from '../../lib/repo.service';
 
 export async function getStaticPaths() {
   requireToken();
-  const repos = readReposConfig();
+  const repos = await readReposConfig();
   const skills = await collectAllSkills(repos);
   return skills.map((skill) => ({ params: { slug: skill.id } }));
 }
@@ -18,7 +18,7 @@ const { slug } = Astro.params;
 if (!slug) throw new Error('Slug requerido');
 
 requireToken();
-const repos = readReposConfig();
+const repos = await readReposConfig();
 // Busca el skill en los repos registrados y trae su markdown.
 const skill = await fetchSkillBySlug(repos, slug);
 const allSkills = await collectAllSkills(repos);
@@ -177,8 +177,20 @@ const skillFileWebUrl = repoContext
       <button type="button" class="vote-button" data-vote="helpful">Sí</button>
       <button type="button" class="vote-button" data-vote="not-helpful">No</button>
     </div>
+    <label class="feedback-label" for="skill-suggestion-input">¿Qué mejorarías o qué faltó?</label>
+    <textarea
+      class="feedback-input"
+      id="skill-suggestion-input"
+      rows="3"
+      maxlength="500"
+      placeholder="Escribe una sugerencia breve..."
+    ></textarea>
+    <div class="feedback-actions">
+      <button type="button" class="feedback-submit-button" id="submit-suggestion-button">Enviar sugerencia</button>
+    </div>
     <p class="telemetry-meta" id="skill-view-meta">Sin vistas registradas todavía.</p>
     <p class="telemetry-meta" id="skill-vote-meta">Aún no hay votos.</p>
+    <p class="telemetry-meta" id="skill-feedback-meta">Tu opinión ayuda a mejorar esta skill.</p>
   </section>
   <div class="skill-content" set:html={skillDocHtml}></div>
   <section class="recommend-section">
@@ -427,6 +439,49 @@ const skillFileWebUrl = repoContext
       font-size: 0.85rem;
       color: var(--muted);
     }
+    .feedback-label {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .feedback-input {
+      width: 100%;
+      resize: vertical;
+      min-height: 92px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 0.72rem 0.8rem;
+      font: inherit;
+    }
+    .feedback-input::placeholder {
+      color: var(--muted);
+    }
+    .feedback-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .feedback-submit-button {
+      border: 1px solid var(--border-strong);
+      background: var(--action-bg);
+      color: var(--action-text);
+      border-radius: 999px;
+      padding: 0.45rem 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 120ms ease, transform 120ms ease;
+    }
+    .feedback-submit-button:hover {
+      background: var(--action-bg-hover);
+      transform: translateY(-1px);
+    }
+    .feedback-submit-button.is-sent {
+      border-color: color-mix(in srgb, var(--success) 65%, transparent);
+      background: color-mix(in srgb, var(--success) 16%, transparent);
+      color: var(--text);
+    }
     .recommend-section {
       margin-top: 1.25rem;
       padding: 1rem;
@@ -489,17 +544,29 @@ const skillFileWebUrl = repoContext
       getRecommendedSkills,
       getSkillViewStats,
       trackHelpfulVote,
+      trackSkillFeedback,
       trackSkillView
     } from '../../lib/client-telemetry';
+    import { startTelemetrySession } from '../../lib/client-telemetry';
 
     const skillProfile = JSON.parse(document.getElementById('skill-profile-json')?.textContent || '{}');
     const recommendationCatalog = JSON.parse(document.getElementById('skill-recommendation-catalog')?.textContent || '[]');
     const voteContainer = document.getElementById('helpful-vote-actions');
     const viewMeta = document.getElementById('skill-view-meta');
     const voteMeta = document.getElementById('skill-vote-meta');
+    const feedbackMeta = document.getElementById('skill-feedback-meta');
     const recommendationsContainer = document.getElementById('recommended-skills-detail');
     const copyInstallButton = document.getElementById('copy-install-command');
     const copyInstallMeta = document.getElementById('copy-install-command-meta');
+    const suggestionInput = document.getElementById('skill-suggestion-input');
+    const suggestionButton = document.getElementById('submit-suggestion-button');
+
+    startTelemetrySession({
+      type: 'skill_view',
+      payload: skillProfile,
+      intervalMs: 30_000,
+      initialDelayMs: 10_000
+    });
 
     async function copyInstallCommand(command: string) {
       if (!command) return;
@@ -558,7 +625,37 @@ const skillFileWebUrl = repoContext
       const vote = target.dataset.vote;
       if (vote !== 'helpful' && vote !== 'not-helpful') return;
       trackHelpfulVote(skillProfile.id, vote);
+      trackSkillFeedback(skillProfile, { helpfulVote: vote });
       renderVoteState();
+      if (feedbackMeta) feedbackMeta.textContent = 'Gracias, tu voto quedó registrado.';
+    });
+
+    suggestionButton?.addEventListener('click', () => {
+      const suggestion = suggestionInput instanceof HTMLTextAreaElement ? suggestionInput.value.trim() : '';
+      if (!suggestion) {
+        if (feedbackMeta) feedbackMeta.textContent = 'Escribe una sugerencia antes de enviar.';
+        return;
+      }
+
+      trackSkillFeedback(skillProfile, { suggestion });
+
+      if (suggestionInput instanceof HTMLTextAreaElement) {
+        suggestionInput.value = '';
+      }
+
+      if (suggestionButton instanceof HTMLButtonElement) {
+        suggestionButton.classList.add('is-sent');
+        suggestionButton.textContent = 'Sugerencia enviada';
+      }
+
+      if (feedbackMeta) feedbackMeta.textContent = 'Gracias. La sugerencia quedó registrada en Supabase.';
+
+      window.setTimeout(() => {
+        if (suggestionButton instanceof HTMLButtonElement) {
+          suggestionButton.classList.remove('is-sent');
+          suggestionButton.textContent = 'Enviar sugerencia';
+        }
+      }, 1800);
     });
 
     copyInstallButton?.addEventListener('click', () => {
@@ -584,7 +681,9 @@ const skillFileWebUrl = repoContext
     title: skill.title,
     url: skill.url,
     description: skill.description,
+    repoId: skill.repoId,
     repoName: skill.repoName,
+    category: skill.frameworks?.[0] || skill.level || 'general',
     frameworks: skill.frameworks,
     testTypes: skill.testTypes,
     tags: skill.tags,

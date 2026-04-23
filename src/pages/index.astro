@@ -22,7 +22,7 @@ const homeRepo: RepoConfig = {
 // Renderiza README remoto a HTML para inyectarlo en server.
 const readme = (await fetchReadme(homeRepo)) || "# README no disponible";
 const homeHtml = mdToHtml(readme);
-const repos = readReposConfig();
+const repos = await readReposConfig();
 const skills = await collectAllSkills(repos);
 const telemetryCatalog = skills.map((skill) => ({
   id: skill.id,

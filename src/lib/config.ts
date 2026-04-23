@@ -1,6 +1,4 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import YAML from 'yaml';
+import { getServerSupabaseClient } from './db/supabase';
 
 /**
  * Configuración declarativa de un repositorio origen.
@@ -28,22 +26,68 @@ export interface RepoConfig {
   tags?: string[];
 }
 
-/** Directorio raíz de ejecución (se usa para resolver paths relativos). */
-const ROOT = process.cwd();
-/** Ruta absoluta al archivo YAML de repos. */
-const CONFIG_PATH = path.join(ROOT, 'config/repos.yaml');
+const REPOS_CACHE_TTL_MS = 5 * 60 * 1000;
+let reposCache: { expiresAt: number; repos: RepoConfig[] } | null = null;
 
 /**
- * Lee config/repos.yaml y devuelve la lista de repos registrados.
- * Retorna [] si el archivo no existe o no contiene el nodo repos.
+ * Lee el catálogo de repos desde Supabase y devuelve la lista registrada.
  *
  * @returns {RepoConfig[]} Lista de configuraciones de repos.
  * @example
  * const repos = readReposConfig();
  */
-export function readReposConfig(): RepoConfig[] {
-  if (!fs.existsSync(CONFIG_PATH)) return [];
-  const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
-  const parsed = YAML.parse(raw);
-  return Array.isArray(parsed?.repos) ? parsed.repos : [];
+export async function readReposConfig(): Promise<RepoConfig[]> {
+  if (reposCache && reposCache.expiresAt > Date.now()) {
+    return reposCache.repos;
+  }
+
+  const supabase = getServerSupabaseClient();
+
+  const [repositoriesResult, tagsResult] = await Promise.all([
+    supabase
+      .from('repositories')
+      .select('repository_id, repository_name, full_name, github_url, description, is_active, created_at')
+      .eq('is_active', true)
+      .order('repository_name', { ascending: true }),
+    supabase.from('repository_tags').select('repository_id, tag')
+  ]);
+
+  if (repositoriesResult.error) {
+    throw new Error(`No se pudo leer repositories: ${repositoriesResult.error.message}`);
+  }
+
+  if (tagsResult.error) {
+    throw new Error(`No se pudo leer repository_tags: ${tagsResult.error.message}`);
+  }
+
+  const tagsByRepository = new Map<string, string[]>();
+  for (const row of tagsResult.data || []) {
+    const repositoryId = String(row.repository_id || '').trim();
+    const tag = String(row.tag || '').trim();
+    if (!repositoryId || !tag) continue;
+
+    const current = tagsByRepository.get(repositoryId) || [];
+    if (!current.includes(tag)) {
+      current.push(tag);
+      tagsByRepository.set(repositoryId, current);
+    }
+  }
+
+  const repos = (repositoriesResult.data || []).map((repo) => ({
+    id: repo.repository_id,
+    name: repo.repository_name,
+    description: repo.description || undefined,
+    repoUrl: repo.github_url,
+    defaultBranch: 'main',
+    readmePath: 'README.md',
+    skillsPath: 'skills',
+    tags: tagsByRepository.get(repo.repository_id) || []
+  }));
+
+  reposCache = {
+    repos,
+    expiresAt: Date.now() + REPOS_CACHE_TTL_MS
+  };
+
+  return repos;
 }

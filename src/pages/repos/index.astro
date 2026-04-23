@@ -4,7 +4,7 @@ import { readReposConfig } from '../../lib/config';
 import { collectAllSkills } from '../../lib/skill.service';
 import { fetchRepoMetrics } from '../../lib/repo.service';
 
-const repos = readReposConfig().sort((a, b) => a.name.localeCompare(b.name));
+const repos = (await readReposConfig()).sort((a, b) => a.name.localeCompare(b.name));
 const totalRepos = repos.length;
 const skills = await collectAllSkills(repos);
 const skillsPerRepo = skills.reduce<Record<string, number>>((acc, skill) => {

@@ -146,9 +146,9 @@ async function main(): Promise<void> {
     console.warn('WARN: No se definio GITHUB_TOKEN/GITHUB_PAT; los repos privados pueden fallar.');
   }
 
-  const repos = readReposConfig();
+  const repos = await readReposConfig();
   if (!repos.length) {
-    throw new Error('No hay repos configurados en config/repos.yaml');
+    throw new Error('No hay repos configurados en la base de datos');
   }
 
   const allSkills: SkillDoc[] = [];

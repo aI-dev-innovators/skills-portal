@@ -7,7 +7,7 @@ import { getBadgeDefinition } from '../lib/badge.service';
 import type { BadgeType } from '../lib/badge.service';
 import type { SkillDoc } from '../lib/skill.service';
 
-const repos = readReposConfig();
+const repos = await readReposConfig();
 const skills = await collectAllSkills(repos);
 const ranked = rankSkills(skills);
 

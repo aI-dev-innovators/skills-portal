@@ -1,13 +1,57 @@
+import {
+  enqueueMetricEvent,
+  getMetricsSessionId,
+  initializeMetricsBuffer
+} from './cache/metrics-buffer';
+
 export type TelemetrySkillProfile = {
   id: string;
   title: string;
   url: string;
   description?: string;
+  repoId?: string;
   repoName?: string;
+  repoFullName?: string;
+  githubUrl?: string;
+  category?: string;
   frameworks?: string[];
   testTypes?: string[];
   tags?: string[];
   score?: number;
+};
+
+type TelemetrySessionOptions =
+  | {
+      type: 'skill_view';
+      payload: Pick<
+        TelemetrySkillProfile,
+        'id' | 'title' | 'description' | 'repoId' | 'repoName' | 'repoFullName' | 'githubUrl' | 'category'
+      >;
+      intervalMs?: number;
+      initialDelayMs?: number;
+    }
+  | {
+      type: 'repository_view';
+      payload: {
+        repositoryId: string;
+        repositoryName?: string;
+        fullName?: string;
+        githubUrl?: string;
+        description?: string;
+        sourcePage?: string;
+      };
+      intervalMs?: number;
+      initialDelayMs?: number;
+    };
+
+type TelemetrySkillFeedback = {
+  skillId: string;
+  title: string;
+  repoId?: string;
+  repoName?: string;
+  repoFullName?: string;
+  githubUrl?: string;
+  category?: string;
 };
 
 type SkillViewEntry = {
@@ -56,6 +100,16 @@ function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 }
 
+function resolveSourcePage(): string {
+  if (!isBrowser()) return 'server';
+  const pathname = window.location.pathname || '/';
+  return pathname;
+}
+
+function createTelemetrySessionId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function readStore(): TelemetryStore {
   if (!isBrowser()) return DEFAULT_STORE;
 
@@ -96,6 +150,8 @@ function pruneEntries<T extends { lastSearchedAt?: string; lastClickedAt?: strin
 }
 
 export function trackSkillView(profile: TelemetrySkillProfile): SkillViewEntry | null {
+  initializeMetricsBuffer();
+
   const store = readStore();
   const existing = store.skillViews[profile.id];
 
@@ -106,7 +162,128 @@ export function trackSkillView(profile: TelemetrySkillProfile): SkillViewEntry |
   };
 
   writeStore(store);
+
   return store.skillViews[profile.id];
+}
+
+export function trackRepositoryView(input: {
+  repositoryId: string;
+  repositoryName?: string;
+  fullName?: string;
+  githubUrl?: string;
+  description?: string;
+  durationSeconds?: number;
+  sourcePage?: string;
+}): void {
+  initializeMetricsBuffer();
+
+  enqueueMetricEvent({
+    type: 'repository_view',
+    payload: {
+      repositoryId: input.repositoryId,
+      repositoryName: input.repositoryName,
+      fullName: input.fullName,
+      githubUrl: input.githubUrl,
+      description: input.description,
+      durationSeconds: input.durationSeconds,
+      sourcePage: input.sourcePage || resolveSourcePage(),
+      sessionId: getMetricsSessionId()
+    }
+  });
+}
+
+export function startTelemetrySession(options: TelemetrySessionOptions): () => void {
+  if (!isBrowser()) return () => undefined;
+
+  initializeMetricsBuffer();
+
+  const sessionToken = createTelemetrySessionId(options.type);
+  const startedAt = Date.now();
+  const intervalMs = options.intervalMs ?? 30_000;
+  const initialDelayMs = options.initialDelayMs ?? 10_000;
+  let stopped = false;
+  let intervalHandle: number | null = null;
+  let initialHandle: number | null = null;
+
+  const emit = (): void => {
+    if (stopped) return;
+
+    const durationSeconds = Math.max(1, Math.floor((Date.now() - startedAt) / 1000));
+    const sourcePage = 'sourcePage' in options.payload ? options.payload.sourcePage : resolveSourcePage();
+
+    if (options.type === 'skill_view') {
+      enqueueMetricEvent({
+        type: 'skill_view',
+        payload: {
+          skillId: options.payload.id,
+          skillName: options.payload.title,
+          category: options.payload.category,
+          description: options.payload.description,
+          repositoryId: options.payload.repoId || options.payload.repoName || 'unknown-repository',
+          repositoryName: options.payload.repoName,
+          fullName: options.payload.repoFullName,
+          githubUrl: options.payload.githubUrl,
+          sourcePage,
+          sessionId: sessionToken,
+          durationSeconds
+        }
+      });
+      return;
+    }
+
+    enqueueMetricEvent({
+      type: 'repository_view',
+      payload: {
+        repositoryId: options.payload.repositoryId,
+        repositoryName: options.payload.repositoryName,
+        fullName: options.payload.fullName,
+        githubUrl: options.payload.githubUrl,
+        description: options.payload.description,
+        sourcePage,
+        sessionId: sessionToken,
+        durationSeconds
+      }
+    });
+  };
+
+  initialHandle = window.setTimeout(() => {
+    emit();
+    intervalHandle = window.setInterval(emit, intervalMs);
+  }, initialDelayMs);
+
+  const stop = async (): Promise<void> => {
+    if (stopped) return;
+    stopped = true;
+    if (initialHandle !== null) window.clearTimeout(initialHandle);
+    if (intervalHandle !== null) window.clearInterval(intervalHandle);
+    emit();
+  };
+
+  window.addEventListener('pagehide', () => {
+    void stop();
+  }, { once: true });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      void stop();
+    }
+  });
+
+  return () => {
+    void stop();
+  };
+}
+
+export function trackLoginEvent(): void {
+  initializeMetricsBuffer();
+
+  enqueueMetricEvent({
+    type: 'login',
+    payload: {
+      sessionId: getMetricsSessionId(),
+      loginStatus: 'ok'
+    }
+  });
 }
 
 export function getSkillViewStats(skillId: string): SkillViewEntry | null {
@@ -132,6 +309,34 @@ export function trackHelpfulVote(skillId: string, vote: 'helpful' | 'not-helpful
   store.helpfulVotes[skillId] = current;
   writeStore(store);
   return current;
+}
+
+export function trackSkillFeedback(
+  profile: TelemetrySkillFeedback,
+  input: { helpfulVote?: 'helpful' | 'not-helpful'; suggestion?: string }
+): void {
+  initializeMetricsBuffer();
+
+  const suggestion = input.suggestion?.trim();
+  if (!input.helpfulVote && !suggestion) return;
+
+  enqueueMetricEvent({
+    type: 'skill_feedback',
+    payload: {
+      skillId: profile.skillId,
+      skillName: profile.title,
+      repositoryId: profile.repoId || profile.repoName || 'unknown-repository',
+      repositoryName: profile.repoName,
+      fullName: profile.repoFullName,
+      githubUrl: profile.githubUrl,
+      description: profile.category,
+      helpfulVote: input.helpfulVote,
+      suggestion,
+      sourcePage: resolveSourcePage(),
+      submittedAt: new Date().toISOString(),
+      sessionId: getMetricsSessionId()
+    }
+  });
 }
 
 export function getHelpfulVoteStats(skillId: string): HelpfulVoteEntry {

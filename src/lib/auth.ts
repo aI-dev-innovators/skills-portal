@@ -1,7 +1,7 @@
+import 'dotenv/config';
 import { betterAuth } from 'better-auth';
-import { memoryAdapter } from 'better-auth/adapters/memory';
 
-const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS || 'example.dominio.pe,dominio.pe')
+const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS || '')
   .split(',')
   .map((domain) => domain.trim().toLowerCase().replace(/^@/, ''))
   .filter(Boolean);
@@ -19,16 +19,9 @@ const baseURL =
   process.env.NEXTAUTH_URL ||
   runtimeFallbackUrl;
 
-const authDb = {
-  user: [],
-  session: [],
-  account: [],
-  verification: [],
-  rateLimit: []
-};
-
 export function isAllowedEmailDomain(email?: string | null): boolean {
   if (!email) return false;
+  if (allowedDomains.length === 0) return true;
   const domain = email.split('@')[1]?.toLowerCase();
   if (!domain) return false;
   return allowedDomains.includes(domain);
@@ -45,7 +38,15 @@ export const auth = betterAuth({
     'https://127.0.0.1:*',
     'https://*.vercel.app'
   ],
-  database: memoryAdapter(authDb),
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 60 * 60 * 24 * 7,
+      refreshCache: {
+        updateAge: 60 * 60 * 24
+      }
+    }
+  },
   socialProviders: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID || '',

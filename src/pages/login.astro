@@ -15,12 +15,14 @@ if (session && authError !== 'AccessDenied') {
 
 const errorMessage =
   authError === 'AccessDenied'
-    ? `Tu cuenta de GitHub no pertenece a un dominio autorizado para esta plataforma. Dominios permitidos: ${allowedDomainsLabel}.`
+    ? allowedDomains.length > 0
+      ? `Tu cuenta de GitHub no pertenece a un dominio autorizado para esta plataforma. Dominios permitidos: ${allowedDomainsLabel}.`
+      : 'Tu cuenta no pudo ser validada correctamente. Revisa la configuración de autenticación.'
     : authError
       ? 'No fue posible iniciar sesion. Intenta nuevamente o contacta al administrador.'
       : '';
----
 
+---
 <Layout title="Iniciar sesion" description="Accede al portal con GitHub">
   <section class="login-wrap">
     <article class="login-card">
@@ -31,7 +33,11 @@ const errorMessage =
       </p>
       {errorMessage ? <p class="login-error" role="alert">{errorMessage}</p> : null}
       <button id="github-login" class="login-btn" type="button">Continuar con GitHub</button>
-      <p class="login-help">Solo se permite acceso con correos de: <strong>{allowedDomainsLabel}</strong></p>
+      {allowedDomains.length > 0 ? (
+        <p class="login-help">Solo se permite acceso con correos de: <strong>{allowedDomainsLabel}</strong></p>
+      ) : (
+        <p class="login-help">No hay restriccion de dominios configurada para este entorno.</p>
+      )}
     </article>
   </section>
 

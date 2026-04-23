@@ -2,7 +2,7 @@
 import { readReposConfig } from '../lib/config';
 
 export async function getStaticPaths() {
-  const repos = readReposConfig();
+  const repos = await readReposConfig();
   return repos.map((repo) => ({ params: { slug: repo.id } }));
 }
 

@@ -23,6 +23,9 @@ Portal de skills con Astro 5 en modo servidor: lee README y SKILL.md desde GitHu
 - `GITHUB_API_BASE_URL`: base de la API REST de GitHub (default `https://api.github.com`).
 - `GITHUB_API_VERSION`: versión de API enviada en `X-GitHub-Api-Version` (default `2026-03-10`).
 - `GITHUB_REPO_OWNER`: owner por defecto para sobreescribir el owner parseado de `repoUrl` (opcional).
+- `PUBLIC_SUPABASE_URL`: URL del proyecto Supabase (solo lectura pública, usada por cliente y servidor).
+- `PUBLIC_SUPABASE_PUBLISHABLE_KEY`: clave publicable de Supabase.
+- `SUPABASE_SERVICE_ROLE_KEY`: clave server-only para upserts e inserción de eventos en backend.
 
 Ejemplo de `.env`:
 
@@ -36,6 +39,9 @@ BETTER_AUTH_URL=https://skills-portal-one.vercel.app
 GITHUB_API_BASE_URL=https://api.github.com
 GITHUB_API_VERSION=2026-04-15
 GITHUB_REPO_OWNER=atdetquizan
+PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+PUBLIC_SUPABASE_PUBLISHABLE_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ```
 
 ## Uso
@@ -64,6 +70,32 @@ URLs útiles en local:
 - Filtros facetados en cliente (repositorio, framework, nivel, tipo de test, estado, búsqueda y toggles).
 - Paginación de resultados aplicada sobre el conjunto filtrado para mantener navegación estable.
 - Exportación consolidada a Excel desde `/skills` con descarga vía endpoint `GET /api/skills-export/`.
+
+## Analytics con Supabase
+
+- Endpoint de ingesta: `POST /api/analytics/ingest`.
+- Catálogo con upsert: `users`, `repositories`, `skills`.
+- Eventos append-only: `login_events`, `skill_views`, `repository_views`.
+- La autenticación de GitHub ya no usa memoria: Better Auth persiste sesiones y cuentas en PostgreSQL para no perder el login al reiniciar.
+- Deduplicación de vistas: misma combinación usuario+skill/repo dentro de 30 segundos no se vuelve a insertar.
+- Buffer cliente: agrupa eventos y hace flush cada 25 segundos, en `pagehide`, `beforeunload` y cuando la pestaña se oculta.
+- Caché de catálogo en memoria: TTL de 10 minutos para repos/skills y 30 minutos para users.
+
+Archivos principales de analytics:
+
+- `src/lib/db/supabase.ts`
+- `src/lib/cache/catalog-cache.ts`
+- `src/lib/cache/metrics-buffer.ts`
+- `src/lib/services/users.ts`
+- `src/lib/services/repositories.ts`
+- `src/lib/services/skills.ts`
+- `src/lib/services/metrics.ts`
+- `src/pages/api/analytics/ingest.ts`
+- `docs/supabase-analytics.sql`
+
+Para crear tablas, índices, RLS y funciones SQL para top métricas, ejecutar el script:
+
+- `docs/supabase-analytics.sql`
 
 ## Comportamiento de datos
 
