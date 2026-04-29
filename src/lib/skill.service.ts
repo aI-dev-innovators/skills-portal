@@ -89,6 +89,11 @@ interface SkillAssetFlags {
 const SKILLS_TTL_MS = 5 * 60 * 1000;
 /** Cache en memoria de skills por id de repositorio. */
 const skillsCache = new Map<string, { expiresAt: number; skills: SkillDoc[] }>();
+const skillsInFlight = new Map<string, Promise<SkillDoc[]>>();
+const skillCountCache = new Map<string, { expiresAt: number; count: number }>();
+const skillCountInFlight = new Map<string, Promise<number>>();
+let aggregateSkillsCache: { key: string; expiresAt: number; skills: SkillDoc[] } | null = null;
+const aggregateSkillsInFlight = new Map<string, Promise<SkillDoc[]>>();
 
 interface SkillCatalogEntryRecord {
   skill_id: string;
@@ -405,12 +410,32 @@ function createUniqueSkillId(repoId: string, baseValue: string, usedIds: Set<str
  * const files = await listSkillFiles(context);
  */
 async function listSkillFiles(context: RepoContext): Promise<string[]> {
+  return listSkillFilesWithCache(context, new Map<string, Promise<GitHubContentEntry[] | null>>());
+}
+
+async function listSkillFilesWithCache(
+  context: RepoContext,
+  dirCache: Map<string, Promise<GitHubContentEntry[] | null>>
+): Promise<string[]> {
   const branch = context.defaultBranch;
   const skillsPath = context.repo.skillsPath || 'skills';
-  const apiUrl = (p: string) => buildContentsUrl(context.slug.owner, context.slug.name, p, branch);
+
+  const readDirEntries = async (pathSegment: string): Promise<GitHubContentEntry[] | null> => {
+    const key = `${context.slug.owner}/${context.slug.name}:${branch}:${pathSegment}`;
+    const cached = dirCache.get(key);
+    if (cached) {
+      return cached;
+    }
+
+    const promise = fetchJson<GitHubContentEntry[]>(
+      buildContentsUrl(context.slug.owner, context.slug.name, pathSegment, branch)
+    );
+    dirCache.set(key, promise);
+    return promise;
+  };
 
   async function walk(pathSegment: string): Promise<string[]> {
-    const entries = await fetchJson<GitHubContentEntry[]>(apiUrl(pathSegment));
+    const entries = await readDirEntries(pathSegment);
     if (!entries) return [];
 
     const collected: string[] = [];
@@ -441,10 +466,18 @@ async function fetchSkillFile(context: RepoContext, filePath: string): Promise<s
   return fetchRepositoryFileText(context.slug.owner, context.slug.name, filePath, context.defaultBranch);
 }
 
-async function fetchSkillJson(context: RepoContext, skillFilePath: string): Promise<SkillJsonMetadata | null> {
+async function fetchSkillJson(
+  context: RepoContext,
+  skillFilePath: string,
+  dirCache?: Map<string, Promise<GitHubContentEntry[] | null>>
+): Promise<SkillJsonMetadata | null> {
   const skillDir = path.posix.dirname(skillFilePath);
-  const listUrl = buildContentsUrl(context.slug.owner, context.slug.name, skillDir, context.defaultBranch);
-  const entries = await fetchJson<GitHubContentEntry[]>(listUrl);
+  const cacheKey = `${context.slug.owner}/${context.slug.name}:${context.defaultBranch}:${skillDir}`;
+  const entriesPromise = dirCache?.get(cacheKey) || fetchJson<GitHubContentEntry[]>(buildContentsUrl(context.slug.owner, context.slug.name, skillDir, context.defaultBranch));
+  if (dirCache && !dirCache.has(cacheKey)) {
+    dirCache.set(cacheKey, entriesPromise);
+  }
+  const entries = await entriesPromise;
   if (!entries?.length) return null;
 
   const skillJsonEntry = entries.find(
@@ -471,8 +504,21 @@ async function fetchSkillJson(context: RepoContext, skillFilePath: string): Prom
 
 async function readSkillAssetFlags(context: RepoContext, skillFilePath: string): Promise<SkillAssetFlags> {
   const skillDir = path.posix.dirname(skillFilePath);
-  const listUrl = buildContentsUrl(context.slug.owner, context.slug.name, skillDir, context.defaultBranch);
-  const entries = await fetchJson<GitHubContentEntry[]>(listUrl);
+  return readSkillAssetFlagsWithCache(context, skillDir);
+}
+
+async function readSkillAssetFlagsWithCache(
+  context: RepoContext,
+  skillDirOrFilePath: string,
+  dirCache?: Map<string, Promise<GitHubContentEntry[] | null>>
+): Promise<SkillAssetFlags> {
+  const skillDir = skillDirOrFilePath.endsWith('.md') ? path.posix.dirname(skillDirOrFilePath) : skillDirOrFilePath;
+  const cacheKey = `${context.slug.owner}/${context.slug.name}:${context.defaultBranch}:${skillDir}`;
+  const entriesPromise = dirCache?.get(cacheKey) || fetchJson<GitHubContentEntry[]>(buildContentsUrl(context.slug.owner, context.slug.name, skillDir, context.defaultBranch));
+  if (dirCache && !dirCache.has(cacheKey)) {
+    dirCache.set(cacheKey, entriesPromise);
+  }
+  const entries = await entriesPromise;
   const folders = new Set((entries || []).filter((entry) => entry.type === 'dir').map((entry) => entry.name.toLowerCase()));
 
   return {
@@ -492,6 +538,20 @@ async function readSkillAssetFlags(context: RepoContext, skillFilePath: string):
  * const skills = await collectSkillsFromRemote(repoConfig);
  */
 export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDoc[]> {
+  const inFlight = skillsInFlight.get(repo.id);
+  if (inFlight) return inFlight;
+
+  const job = collectSkillsFromRemoteInternal(repo);
+  skillsInFlight.set(repo.id, job);
+
+  try {
+    return await job;
+  } finally {
+    skillsInFlight.delete(repo.id);
+  }
+}
+
+async function collectSkillsFromRemoteInternal(repo: RepoConfig): Promise<SkillDoc[]> {
   const cacheHit = skillsCache.get(repo.id);
   if (cacheHit && cacheHit.expiresAt > Date.now()) {
     return cacheHit.skills;
@@ -511,8 +571,9 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
 
   // Fetch repo metrics once for all skills
   const metrics = await fetchRepoMetrics(repo, context);
+  const dirCache = new Map<string, Promise<GitHubContentEntry[] | null>>();
 
-  const files = await listSkillFiles(context);
+  const files = await listSkillFilesWithCache(context, dirCache);
   console.log(`[skills:${repo.id}] archivos SKILL.md detectados: ${files.length}`);
 
   if (files.length === 0 && cachedSkills && cachedSkills.length > 0) {
@@ -529,7 +590,10 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
       return null;
     }
 
-    const [skillJson, assets] = await Promise.all([fetchSkillJson(context, filePath), readSkillAssetFlags(context, filePath)]);
+    const [skillJson, assets] = await Promise.all([
+      fetchSkillJson(context, filePath, dirCache),
+      readSkillAssetFlagsWithCache(context, filePath, dirCache)
+    ]);
 
     const parsed = parseSkillMarkdown(raw, repo.id, filePath);
     const fallback = path.basename(path.dirname(filePath)) || path.basename(filePath);
@@ -618,6 +682,73 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
   return cleanSkills;
 }
 
+async function countSkillsFromRemote(repo: RepoConfig): Promise<number> {
+  const cacheHit = skillCountCache.get(repo.id);
+  if (cacheHit && cacheHit.expiresAt > Date.now()) {
+    return cacheHit.count;
+  }
+
+  const inFlight = skillCountInFlight.get(repo.id);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const job = (async () => {
+    const repoSkillsCache = skillsCache.get(repo.id);
+    if (repoSkillsCache && repoSkillsCache.expiresAt > Date.now()) {
+      const count = repoSkillsCache.skills.length;
+      skillCountCache.set(repo.id, { count, expiresAt: Date.now() + SKILLS_TTL_MS });
+      return count;
+    }
+
+    const cachedSkills = await readCachedSkillsFromDatabase(repo);
+    if (cachedSkills && cachedSkills.length > 0) {
+      skillCountCache.set(repo.id, { count: cachedSkills.length, expiresAt: Date.now() + SKILLS_TTL_MS });
+      return cachedSkills.length;
+    }
+
+    const context = await getRepoContext(repo);
+    if (!context) {
+      skillCountCache.set(repo.id, { count: 0, expiresAt: Date.now() + SKILLS_TTL_MS });
+      return 0;
+    }
+
+    const dirCache = new Map<string, Promise<GitHubContentEntry[] | null>>();
+    const files = await listSkillFilesWithCache(context, dirCache);
+    const count = files.length;
+    skillCountCache.set(repo.id, { count, expiresAt: Date.now() + SKILLS_TTL_MS });
+    return count;
+  })();
+
+  skillCountInFlight.set(repo.id, job);
+
+  try {
+    return await job;
+  } finally {
+    skillCountInFlight.delete(repo.id);
+  }
+}
+
+export async function collectSkillCountsByRepo(repos: RepoConfig[]): Promise<Record<string, number>> {
+  const results = await Promise.all(
+    repos.map(async (repo) => {
+      try {
+        const count = await countSkillsFromRemote(repo);
+        return [repo.id, count] as const;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Error desconocido';
+        console.error(`[skills:${repo.id}] Error contando skills: ${message}`);
+        return [repo.id, 0] as const;
+      }
+    })
+  );
+
+  return results.reduce<Record<string, number>>((acc, [repoId, count]) => {
+    acc[repoId] = count;
+    return acc;
+  }, {});
+}
+
 /**
  * Reúne skills de todos los repositorios configurados en paralelo.
  *
@@ -627,6 +758,31 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
  * const catalog = await collectAllSkills(repos);
  */
 export async function collectAllSkills(repos: RepoConfig[]): Promise<SkillDoc[]> {
+  const cacheKey = repos
+    .map((repo) => repo.id)
+    .sort((a, b) => a.localeCompare(b))
+    .join('|');
+
+  if (aggregateSkillsCache && aggregateSkillsCache.key === cacheKey && aggregateSkillsCache.expiresAt > Date.now()) {
+    return aggregateSkillsCache.skills;
+  }
+
+  const inFlight = aggregateSkillsInFlight.get(cacheKey);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const job = collectAllSkillsInternal(repos, cacheKey);
+  aggregateSkillsInFlight.set(cacheKey, job);
+
+  try {
+    return await job;
+  } finally {
+    aggregateSkillsInFlight.delete(cacheKey);
+  }
+}
+
+async function collectAllSkillsInternal(repos: RepoConfig[], cacheKey: string): Promise<SkillDoc[]> {
   const perRepo = await Promise.all(
     repos.map(async (repo) => {
       try {
@@ -639,7 +795,13 @@ export async function collectAllSkills(repos: RepoConfig[]): Promise<SkillDoc[]>
     })
   );
 
-  return perRepo.flat();
+  const allSkills = perRepo.flat();
+  aggregateSkillsCache = {
+    key: cacheKey,
+    skills: allSkills,
+    expiresAt: Date.now() + SKILLS_TTL_MS
+  };
+  return allSkills;
 }
 
 /**

@@ -1,5 +1,6 @@
 import type { MiddlewareHandler } from 'astro';
 import { auth, canManageRepositories, isAllowedEmailDomain } from './lib/auth';
+import { upsertUser } from './lib/services/users';
 
 const authDebugEnabled =
   (import.meta.env.AUTH_DEBUG_LOGS || process.env.AUTH_DEBUG_LOGS || '').toLowerCase() === 'true';
@@ -15,6 +16,32 @@ function authDebugLog(message: string, meta?: Record<string, unknown>): void {
 
 function isAssetPath(pathname: string): boolean {
   return /\.[a-zA-Z0-9]+$/.test(pathname) || pathname.startsWith('/_astro/');
+}
+
+const USER_SYNC_TTL_MS = 5 * 60 * 1000;
+const userSyncCache = new Map<string, number>();
+
+async function syncUserToCatalog(user: { id: string; email?: string | null; name?: string | null }): Promise<void> {
+  if (!user?.id || !user?.email) return;
+
+  const now = Date.now();
+  const nextAllowedSync = userSyncCache.get(user.id) || 0;
+  if (nextAllowedSync > now) return;
+
+  const timestamp = new Date().toISOString();
+  const firstSync = !userSyncCache.has(user.id);
+
+  await upsertUser({
+    user_id: user.id,
+    email: user.email,
+    display_name: user.name || null,
+    provider: 'github',
+    last_seen_at: timestamp,
+    last_login_at: firstSync ? timestamp : undefined,
+    is_active: true
+  });
+
+  userSyncCache.set(user.id, now + USER_SYNC_TTL_MS);
 }
 
 export const onRequest: MiddlewareHandler = async (context, next) => {
@@ -83,6 +110,17 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
 
     const target = !sessionData?.session ? '/login/' : '/login/?error=AccessDenied';
     return context.redirect(target);
+  }
+
+  try {
+    await syncUserToCatalog(sessionData.user);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'UnknownError';
+    console.warn('[auth-sync] no se pudo registrar usuario en users', {
+      userId: sessionData.user.id,
+      email: sessionData.user.email,
+      message
+    });
   }
 
   return next();

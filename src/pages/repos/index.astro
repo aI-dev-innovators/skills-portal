@@ -1,19 +1,14 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { readReposConfig } from '../../lib/config';
-import { collectAllSkills } from '../../lib/skill.service';
+import { collectSkillCountsByRepo } from '../../lib/skill.service';
 import { fetchRepoMetrics } from '../../lib/repo.service';
 
 const canManageRepositories = Astro.locals.canManageRepositories ?? false;
 
 const repos = (await readReposConfig()).sort((a, b) => a.name.localeCompare(b.name));
 const totalRepos = repos.length;
-const skills = await collectAllSkills(repos);
-const skillsPerRepo = skills.reduce<Record<string, number>>((acc, skill) => {
-  const key = skill.repoId || skill.repoName || '';
-  acc[key] = (acc[key] || 0) + 1;
-  return acc;
-}, {});
+const skillsPerRepo = await collectSkillCountsByRepo(repos);
 const tagOptions = Array.from(new Set(repos.flatMap((r) => r.tags || []))).sort();
 const repoRows = await Promise.all(
   repos.map(async (repo) => {
