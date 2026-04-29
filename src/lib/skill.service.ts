@@ -119,6 +119,11 @@ interface SkillCatalogEntryRecord {
   is_active?: boolean;
 }
 
+interface ParsedSkillMarkdown {
+  data: Record<string, unknown>;
+  content: string;
+}
+
 /**
  * Elimina propiedades con valor undefined en un objeto plano.
  *
@@ -329,8 +334,29 @@ async function persistSkillsToDatabase(repo: RepoConfig, skills: SkillDoc[]): Pr
   const { error } = await supabase.from('skill_catalog_entries').upsert(payload, { onConflict: 'skill_id' });
 
   if (error) {
-    if (error.code === '42P01' || error.code === 'PGRST205') return;
+    if (error.code === '42P01' || error.code === 'PGRST205' || error.code === '23503') return;
     logSupabaseError({ operation: 'persistSkillsToDatabase', table: 'skill_catalog_entries', payload: { repositoryId: repo.id, count: skills.length } }, error);
+  }
+}
+
+function stripFrontmatterBlock(raw: string): string {
+  return raw.replace(/^---\n[\s\S]*?\n---\n?/, '');
+}
+
+function parseSkillMarkdown(raw: string, repoId: string, filePath: string): ParsedSkillMarkdown {
+  try {
+    const parsed = matter(raw);
+    return {
+      data: (parsed.data as Record<string, unknown>) || {},
+      content: parsed.content
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error de parseo desconocido';
+    console.warn(`[skills:${repoId}] Frontmatter invalido en ${filePath}. Se aplicara fallback. ${message}`);
+    return {
+      data: {},
+      content: stripFrontmatterBlock(raw)
+    };
   }
 }
 
@@ -472,14 +498,14 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
   }
 
   const cachedSkills = await readCachedSkillsFromDatabase(repo);
-  if (cachedSkills && cachedSkills.length > 0) {
-    skillsCache.set(repo.id, { skills: cachedSkills, expiresAt: Date.now() + SKILLS_TTL_MS });
-    return cachedSkills;
-  }
 
   const context = await getRepoContext(repo);
   if (!context) {
     console.error(`[skills:${repo.id}] No se pudo resolver metadata del repo.`);
+    if (cachedSkills && cachedSkills.length > 0) {
+      skillsCache.set(repo.id, { skills: cachedSkills, expiresAt: Date.now() + SKILLS_TTL_MS });
+      return cachedSkills;
+    }
     return [];
   }
 
@@ -488,6 +514,12 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
 
   const files = await listSkillFiles(context);
   console.log(`[skills:${repo.id}] archivos SKILL.md detectados: ${files.length}`);
+
+  if (files.length === 0 && cachedSkills && cachedSkills.length > 0) {
+    skillsCache.set(repo.id, { skills: cachedSkills, expiresAt: Date.now() + SKILLS_TTL_MS });
+    return cachedSkills;
+  }
+
   const usedIds = new Set<string>();
 
   const skills = await mapLimit(files, 5, async (filePath) => {
@@ -499,7 +531,7 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
 
     const [skillJson, assets] = await Promise.all([fetchSkillJson(context, filePath), readSkillAssetFlags(context, filePath)]);
 
-    const parsed = matter(raw);
+    const parsed = parseSkillMarkdown(raw, repo.id, filePath);
     const fallback = path.basename(path.dirname(filePath)) || path.basename(filePath);
     const baseValue = String(parsed.data?.name || fallback);
     const skillId = createUniqueSkillId(repo.id, baseValue, usedIds);
@@ -575,6 +607,12 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
   });
 
   const cleanSkills = skills.filter((skill): skill is SkillDoc => Boolean(skill));
+
+  if (cleanSkills.length === 0 && cachedSkills && cachedSkills.length > 0) {
+    skillsCache.set(repo.id, { skills: cachedSkills, expiresAt: Date.now() + SKILLS_TTL_MS });
+    return cachedSkills;
+  }
+
   skillsCache.set(repo.id, { skills: cleanSkills, expiresAt: Date.now() + SKILLS_TTL_MS });
   await persistSkillsToDatabase(repo, cleanSkills);
   return cleanSkills;

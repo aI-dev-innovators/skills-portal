@@ -1,4 +1,7 @@
 import { getServerSupabaseClient } from './db/supabase';
+import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import matter from 'gray-matter';
 
 /**
  * Configuración declarativa de un repositorio origen.
@@ -29,6 +32,62 @@ export interface RepoConfig {
 const REPOS_CACHE_TTL_MS = 5 * 60 * 1000;
 let reposCache: { expiresAt: number; repos: RepoConfig[] } | null = null;
 
+async function readLocalReposFromContent(): Promise<RepoConfig[]> {
+  const reposRoot = path.resolve(process.cwd(), 'src/content/repos');
+  let entries: string[] = [];
+
+  try {
+    entries = await readdir(reposRoot);
+  } catch {
+    return [];
+  }
+
+  const repos = await Promise.all(
+    entries.map(async (entry) => {
+      const indexPath = path.join(reposRoot, entry, 'index.md');
+
+      try {
+        const raw = await readFile(indexPath, 'utf8');
+        const parsed = matter(raw);
+        const data = parsed.data || {};
+
+        const id = String(data.id || '').trim();
+        const name = String(data.name || '').trim();
+        const repoUrl = String(data.repoUrl || '').trim();
+
+        if (!id || !name || !repoUrl) {
+          return null;
+        }
+
+        const repo: RepoConfig = {
+          id,
+          name,
+          repoUrl,
+          defaultBranch: String(data.defaultBranch || '').trim() || 'main',
+          readmePath: String(data.readmePath || '').trim() || 'README.md',
+          skillsPath: String(data.skillsPath || '').trim() || 'skills',
+          tags: Array.isArray(data.tags)
+            ? data.tags
+                .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+                .map((tag) => tag.trim())
+            : []
+        };
+
+        const description = String(data.description || '').trim();
+        if (description) {
+          repo.description = description;
+        }
+
+        return repo;
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return repos.filter((repo): repo is NonNullable<typeof repo> => repo !== null);
+}
+
 export function invalidateReposConfigCache(): void {
   reposCache = null;
 }
@@ -46,6 +105,7 @@ export async function readReposConfig(): Promise<RepoConfig[]> {
   }
 
   const supabase = getServerSupabaseClient();
+  const localReposPromise = readLocalReposFromContent();
 
   const [repositoriesResult, tagsResult] = await Promise.all([
     supabase
@@ -88,10 +148,22 @@ export async function readReposConfig(): Promise<RepoConfig[]> {
     tags: tagsByRepository.get(repo.repository_id) || []
   }));
 
+  const localRepos = await localReposPromise;
+  const mergedById = new Map<string, RepoConfig>();
+
+  for (const repo of localRepos) {
+    mergedById.set(repo.id, repo);
+  }
+  for (const repo of repos) {
+    mergedById.set(repo.id, repo);
+  }
+
+  const mergedRepos = Array.from(mergedById.values()).sort((a, b) => a.name.localeCompare(b.name));
+
   reposCache = {
-    repos,
+    repos: mergedRepos,
     expiresAt: Date.now() + REPOS_CACHE_TTL_MS
   };
 
-  return repos;
+  return mergedRepos;
 }
