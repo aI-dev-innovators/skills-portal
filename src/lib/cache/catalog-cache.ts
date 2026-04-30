@@ -26,6 +26,10 @@ class TtlMemoryCache {
   delete(key: string): void {
     this.values.delete(key);
   }
+
+  clear(): void {
+    this.values.clear();
+  }
 }
 
 const cache = new TtlMemoryCache();
@@ -55,4 +59,8 @@ export function invalidateCatalogByPrefix(prefix: string): void {
       cache.delete(key);
     }
   }
+}
+
+export function invalidateAllCatalogCache(): void {
+  cache.clear();
 }

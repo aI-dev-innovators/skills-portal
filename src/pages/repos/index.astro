@@ -68,7 +68,8 @@ function formatShortDate(value: string | null): string {
       {canManageRepositories && (
         <div class="admin-actions">
           <button class="admin-action admin-action--primary" type="button" data-admin-action="create" onclick="handleRepoAdminAction(event)">Agregar repositorio</button>
-          <p class="admin-note">Tu correo tiene permisos de gestión para este catálogo.</p>
+          <button class="admin-action admin-action--secondary" type="button" data-admin-action="clear-cache" onclick="handleRepoAdminAction(event)">Limpiar cache</button>
+          <p class="admin-note" id="admin-actions-status">Tu correo tiene permisos de gestión para este catálogo.</p>
         </div>
       )}
     </div>
@@ -547,7 +548,7 @@ function formatShortDate(value: string | null): string {
       justify-content: flex-end;
       gap: 0.65rem;
       flex-wrap: wrap;
-      padding: 0 1.2rem 1.2rem;
+      padding: 0.7rem 1.2rem 1.2rem;
     }
     .admin-modal__status {
       margin: 0;
@@ -556,6 +557,20 @@ function formatShortDate(value: string | null): string {
     }
     .admin-modal__submit {
       min-width: 180px;
+    }
+    .admin-modal__submit--danger {
+      background: rgba(180, 40, 69, 0.14);
+      color: var(--danger);
+      border-color: rgba(180, 40, 69, 0.32);
+    }
+    .admin-modal__submit--danger:hover {
+      background: rgba(180, 40, 69, 0.2);
+      color: var(--danger);
+    }
+    .admin-modal__confirm-text {
+      margin: 0;
+      color: var(--text);
+      line-height: 1.5;
     }
     a { color: var(--accent); }
     a:hover { color: var(--link-hover); }
@@ -657,12 +672,37 @@ function formatShortDate(value: string | null): string {
     </dialog>
   )}
 
+  {canManageRepositories && (
+    <dialog id="repo-confirm-modal" class="admin-modal" aria-labelledby="repo-confirm-modal-title">
+      <form method="dialog" class="admin-modal__panel">
+        <div class="admin-modal__header">
+          <div>
+            <p class="admin-modal__eyebrow">Confirmación</p>
+            <h3 id="repo-confirm-modal-title" class="admin-modal__title">Confirmar acción</h3>
+            <p id="repo-confirm-modal-message" class="admin-modal__confirm-text">
+              Esta acción requiere tu confirmación.
+            </p>
+          </div>
+          <button class="admin-modal__close" type="button" onclick="closeRepoConfirmModal(false)" aria-label="Cerrar modal">×</button>
+        </div>
+
+        <div class="admin-modal__footer">
+          <button class="ghost" type="button" onclick="closeRepoConfirmModal(false)">Cancelar</button>
+          <button class="admin-action admin-action--secondary admin-modal__submit" id="repo-confirm-modal-submit" type="button" onclick="closeRepoConfirmModal(true)">
+            Confirmar
+          </button>
+        </div>
+      </form>
+    </dialog>
+  )}
+
   <script>
     const list = document.getElementById('repo-list');
     const tagSelect = document.getElementById('repo-tag');
     const statusSelect = document.getElementById('repo-status');
     const resultsCount = document.getElementById('repo-results-count');
     const emptyState = document.getElementById('repo-empty-state');
+    const adminActionsStatus = document.getElementById('admin-actions-status') as HTMLParagraphElement | null;
     const repoAdminModal = document.getElementById('repo-admin-modal') as HTMLDialogElement | null;
     const repoAdminForm = document.getElementById('repo-admin-form') as HTMLFormElement | null;
     const repoAdminTitle = document.getElementById('repo-admin-modal-title') as HTMLHeadingElement | null;
@@ -676,6 +716,12 @@ function formatShortDate(value: string | null): string {
     const repoAdminDescription = document.getElementById('repo-admin-description') as HTMLTextAreaElement | null;
     const repoAdminTags = document.getElementById('repo-admin-tags') as HTMLInputElement | null;
     const repoAdminActive = document.getElementById('repo-admin-active') as HTMLInputElement | null;
+    const repoConfirmModal = document.getElementById('repo-confirm-modal') as HTMLDialogElement | null;
+    const repoConfirmModalTitle = document.getElementById('repo-confirm-modal-title') as HTMLHeadingElement | null;
+    const repoConfirmModalMessage = document.getElementById('repo-confirm-modal-message') as HTMLParagraphElement | null;
+    const repoConfirmModalSubmit = document.getElementById('repo-confirm-modal-submit') as HTMLButtonElement | null;
+
+    let repoConfirmResolver: ((confirmed: boolean) => void) | null = null;
 
     function setRepoAdminMode(mode: 'create' | 'edit'): void {
       if (repoAdminForm) {
@@ -735,6 +781,42 @@ function formatShortDate(value: string | null): string {
       repoAdminModal?.close();
     }
 
+    function closeRepoConfirmModal(confirmed = false): void {
+      repoConfirmModal?.close();
+      if (repoConfirmResolver) {
+        repoConfirmResolver(confirmed);
+        repoConfirmResolver = null;
+      }
+    }
+
+    function confirmWithRepoModal(config: {
+      title: string;
+      message: string;
+      confirmLabel: string;
+      confirmVariant?: 'default' | 'danger';
+    }): Promise<boolean> {
+      if (!repoConfirmModal) {
+        return Promise.resolve(window.confirm(config.message));
+      }
+
+      if (repoConfirmModalTitle) repoConfirmModalTitle.textContent = config.title;
+      if (repoConfirmModalMessage) repoConfirmModalMessage.textContent = config.message;
+
+      if (repoConfirmModalSubmit) {
+        repoConfirmModalSubmit.textContent = config.confirmLabel;
+        repoConfirmModalSubmit.classList.remove('admin-modal__submit--danger');
+        if (config.confirmVariant === 'danger') {
+          repoConfirmModalSubmit.classList.add('admin-modal__submit--danger');
+        }
+      }
+
+      repoConfirmModal.showModal();
+
+      return new Promise<boolean>((resolve) => {
+        repoConfirmResolver = resolve;
+      });
+    }
+
     function filterRepos() {
       if (!list) return;
       const term = (document.querySelector('#repo-card input') as HTMLInputElement | null)?.value?.toLowerCase().trim() || '';
@@ -768,7 +850,7 @@ function formatShortDate(value: string | null): string {
 
     filterRepos();
 
-    function handleRepoAdminAction(event: MouseEvent): void {
+    async function handleRepoAdminAction(event: MouseEvent): Promise<void> {
       const target = event.currentTarget as HTMLButtonElement | null;
       const action = target?.dataset?.adminAction;
       const repoName = target?.dataset?.repoName || 'este repositorio';
@@ -791,11 +873,78 @@ function formatShortDate(value: string | null): string {
         return;
       }
 
-      if (action === 'delete') {
-        const confirmed = window.confirm(`Eliminar ${repoName} se conectará al módulo de administración. ¿Continuar?`);
-        if (confirmed) {
-          window.alert('Eliminación pendiente de implementación en backend.');
+      if (action === 'clear-cache') {
+        const confirmed = await confirmWithRepoModal({
+          title: 'Limpiar cache del catálogo',
+          message: 'Se limpiará la cache en memoria y se forzará una recarga de datos. ¿Deseas continuar?',
+          confirmLabel: 'Sí, limpiar cache'
+        });
+        if (!confirmed) return;
+
+        if (adminActionsStatus) {
+          adminActionsStatus.textContent = 'Limpiando cache...';
         }
+
+        fetch('/api/admin/cache-clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+          .then(async (response) => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(String((data as { error?: string }).error || 'No se pudo limpiar la cache'));
+            }
+            if (adminActionsStatus) {
+              adminActionsStatus.textContent = 'Cache limpiada. Recargando resultados...';
+            }
+            window.location.reload();
+          })
+          .catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : 'Error inesperado';
+            if (adminActionsStatus) {
+              adminActionsStatus.textContent = message;
+            } else {
+              window.alert(message);
+            }
+          });
+        return;
+      }
+
+      if (action === 'delete') {
+        const repoId = target?.dataset?.repoId || '';
+        const confirmed = await confirmWithRepoModal({
+          title: `Eliminar ${repoName}`,
+          message: `Eliminar ${repoName} también removerá sus tags y registros dependientes. Esta acción no se puede deshacer.`,
+          confirmLabel: 'Sí, eliminar repositorio',
+          confirmVariant: 'danger'
+        });
+        if (!confirmed || !repoId) return;
+
+        repoAdminStatus && (repoAdminStatus.textContent = `Eliminando ${repoName}...`);
+
+        fetch('/api/admin/repositories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'delete',
+            repository_id: repoId
+          })
+        })
+          .then(async (response) => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(String((data as { error?: string }).error || 'No se pudo eliminar el repositorio'));
+            }
+            window.location.reload();
+          })
+          .catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : 'Error inesperado';
+            if (repoAdminStatus) {
+              repoAdminStatus.textContent = message;
+            } else {
+              window.alert(message);
+            }
+          });
       }
     }
 
@@ -851,6 +1000,14 @@ function formatShortDate(value: string | null): string {
         closeRepoAdminModal();
       }
     });
+    repoConfirmModal?.addEventListener('click', (event: MouseEvent) => {
+      if (event.target === repoConfirmModal) {
+        closeRepoConfirmModal(false);
+      }
+    });
+    repoConfirmModal?.addEventListener('cancel', () => {
+      closeRepoConfirmModal(false);
+    });
 
     // Exponer función para el oninput inline.
     // @ts-ignore
@@ -859,6 +1016,8 @@ function formatShortDate(value: string | null): string {
     window.openRepoAdminModal = openRepoAdminModal;
     // @ts-ignore
     window.closeRepoAdminModal = closeRepoAdminModal;
+    // @ts-ignore
+    window.closeRepoConfirmModal = closeRepoConfirmModal;
     // @ts-ignore
     window.handleRepoAdminAction = handleRepoAdminAction;
   </script>

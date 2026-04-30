@@ -18,6 +18,15 @@ function isAssetPath(pathname: string): boolean {
   return /\.[a-zA-Z0-9]+$/.test(pathname) || pathname.startsWith('/_astro/');
 }
 
+function hasValidCronSecret(request: Request): boolean {
+  const expected = process.env.CATALOG_SYNC_SECRET || process.env.CRON_SECRET;
+  if (!expected) return false;
+
+  const header = request.headers.get('x-catalog-sync-secret') || request.headers.get('authorization') || '';
+  const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : header.trim();
+  return token.length > 0 && token === expected;
+}
+
 const USER_SYNC_TTL_MS = 5 * 60 * 1000;
 const userSyncCache = new Map<string, number>();
 
@@ -48,6 +57,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   const { pathname } = context.url;
   const req = context.request;
   const isAuthRoute = pathname.startsWith('/api/auth');
+  const isCatalogSyncRoute = pathname === '/api/admin/catalog-sync';
 
   if (isAuthRoute) {
     authDebugLog('Incoming auth route request', {
@@ -64,6 +74,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/api/auth') ||
+    (isCatalogSyncRoute && hasValidCronSecret(req)) ||
     isAssetPath(pathname)
   ) {
     const response = await next();

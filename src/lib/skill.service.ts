@@ -85,6 +85,10 @@ interface SkillAssetFlags {
   hasScripts: boolean;
 }
 
+interface CollectSkillsOptions {
+  refresh?: boolean;
+}
+
 /** Tiempo de vida de la cache por repositorio en milisegundos. */
 const SKILLS_TTL_MS = 5 * 60 * 1000;
 /** Cache en memoria de skills por id de repositorio. */
@@ -94,6 +98,27 @@ const skillCountCache = new Map<string, { expiresAt: number; count: number }>();
 const skillCountInFlight = new Map<string, Promise<number>>();
 let aggregateSkillsCache: { key: string; expiresAt: number; skills: SkillDoc[] } | null = null;
 const aggregateSkillsInFlight = new Map<string, Promise<SkillDoc[]>>();
+const CATALOG_ALLOW_REMOTE_FALLBACK =
+  (process.env.CATALOG_ALLOW_REMOTE_FALLBACK || 'false').trim().toLowerCase() === 'true';
+
+export function invalidateSkillsCatalogCache(repoId?: string): void {
+  if (!repoId) {
+    skillsCache.clear();
+    skillsInFlight.clear();
+    skillCountCache.clear();
+    skillCountInFlight.clear();
+    aggregateSkillsInFlight.clear();
+    aggregateSkillsCache = null;
+    return;
+  }
+
+  skillsCache.delete(repoId);
+  skillsInFlight.delete(repoId);
+  skillCountCache.delete(repoId);
+  skillCountInFlight.delete(repoId);
+  aggregateSkillsInFlight.clear();
+  aggregateSkillsCache = null;
+}
 
 interface SkillCatalogEntryRecord {
   skill_id: string;
@@ -331,6 +356,72 @@ async function readCachedSkillsFromDatabase(repo: RepoConfig): Promise<SkillDoc[
   return (data as SkillCatalogEntryRecord[]).map(deserializeSkillDoc);
 }
 
+async function readCachedSkillsByRepoFromDatabase(repos: RepoConfig[]): Promise<Map<string, SkillDoc[]>> {
+  if (repos.length === 0) return new Map<string, SkillDoc[]>();
+
+  const supabase = getServerSupabaseClient();
+  const repoIds = repos.map((repo) => repo.id);
+  const { data, error } = await supabase
+    .from('skill_catalog_entries')
+    .select('*')
+    .in('repository_id', repoIds)
+    .eq('is_active', true)
+    .order('skill_name', { ascending: true });
+
+  if (error) {
+    if (error.code === '42P01' || error.code === 'PGRST205') return new Map<string, SkillDoc[]>();
+    logSupabaseError(
+      { operation: 'readCachedSkillsByRepoFromDatabase', table: 'skill_catalog_entries', payload: { repositories: repoIds } },
+      error
+    );
+    return new Map<string, SkillDoc[]>();
+  }
+
+  const grouped = new Map<string, SkillDoc[]>();
+  for (const row of (data as SkillCatalogEntryRecord[]) || []) {
+    const item = deserializeSkillDoc(row);
+    const current = grouped.get(item.repoId) || [];
+    current.push(item);
+    grouped.set(item.repoId, current);
+  }
+
+  return grouped;
+}
+
+async function readSkillCountsByRepoFromDatabase(repos: RepoConfig[]): Promise<Record<string, number>> {
+  const counts = repos.reduce<Record<string, number>>((acc, repo) => {
+    acc[repo.id] = 0;
+    return acc;
+  }, {});
+
+  if (repos.length === 0) return counts;
+
+  const supabase = getServerSupabaseClient();
+  const repoIds = repos.map((repo) => repo.id);
+  const { data, error } = await supabase
+    .from('skill_catalog_entries')
+    .select('repository_id')
+    .in('repository_id', repoIds)
+    .eq('is_active', true);
+
+  if (error) {
+    if (error.code === '42P01' || error.code === 'PGRST205') return counts;
+    logSupabaseError(
+      { operation: 'readSkillCountsByRepoFromDatabase', table: 'skill_catalog_entries', payload: { repositories: repoIds } },
+      error
+    );
+    return counts;
+  }
+
+  for (const row of (data as Array<{ repository_id: string }>) || []) {
+    const repositoryId = String(row.repository_id || '').trim();
+    if (!repositoryId || !(repositoryId in counts)) continue;
+    counts[repositoryId] += 1;
+  }
+
+  return counts;
+}
+
 async function persistSkillsToDatabase(repo: RepoConfig, skills: SkillDoc[]): Promise<void> {
   if (skills.length === 0) return;
 
@@ -537,11 +628,11 @@ async function readSkillAssetFlagsWithCache(
  * @example
  * const skills = await collectSkillsFromRemote(repoConfig);
  */
-export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDoc[]> {
+export async function collectSkillsFromRemote(repo: RepoConfig, options: CollectSkillsOptions = {}): Promise<SkillDoc[]> {
   const inFlight = skillsInFlight.get(repo.id);
   if (inFlight) return inFlight;
 
-  const job = collectSkillsFromRemoteInternal(repo);
+  const job = collectSkillsFromRemoteInternal(repo, options);
   skillsInFlight.set(repo.id, job);
 
   try {
@@ -551,13 +642,17 @@ export async function collectSkillsFromRemote(repo: RepoConfig): Promise<SkillDo
   }
 }
 
-async function collectSkillsFromRemoteInternal(repo: RepoConfig): Promise<SkillDoc[]> {
+async function collectSkillsFromRemoteInternal(repo: RepoConfig, options: CollectSkillsOptions): Promise<SkillDoc[]> {
   const cacheHit = skillsCache.get(repo.id);
   if (cacheHit && cacheHit.expiresAt > Date.now()) {
     return cacheHit.skills;
   }
 
   const cachedSkills = await readCachedSkillsFromDatabase(repo);
+  if (!options.refresh && cachedSkills && cachedSkills.length > 0) {
+    skillsCache.set(repo.id, { skills: cachedSkills, expiresAt: Date.now() + SKILLS_TTL_MS });
+    return cachedSkills;
+  }
 
   const context = await getRepoContext(repo);
   if (!context) {
@@ -730,6 +825,13 @@ async function countSkillsFromRemote(repo: RepoConfig): Promise<number> {
 }
 
 export async function collectSkillCountsByRepo(repos: RepoConfig[]): Promise<Record<string, number>> {
+  const dbCounts = await readSkillCountsByRepoFromDatabase(repos);
+  const hasCatalogData = Object.values(dbCounts).some((count) => count > 0);
+
+  if (hasCatalogData || !CATALOG_ALLOW_REMOTE_FALLBACK) {
+    return dbCounts;
+  }
+
   const results = await Promise.all(
     repos.map(async (repo) => {
       try {
@@ -783,25 +885,88 @@ export async function collectAllSkills(repos: RepoConfig[]): Promise<SkillDoc[]>
 }
 
 async function collectAllSkillsInternal(repos: RepoConfig[], cacheKey: string): Promise<SkillDoc[]> {
-  const perRepo = await Promise.all(
-    repos.map(async (repo) => {
-      try {
-        return await collectSkillsFromRemote(repo);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Error desconocido';
-        console.error(`[skills:${repo.id}] Error inesperado: ${message}`);
-        return [];
-      }
-    })
-  );
+  const cachedByRepo = await readCachedSkillsByRepoFromDatabase(repos);
+  const hasCatalogData = Array.from(cachedByRepo.values()).some((skills) => skills.length > 0);
+
+  let perRepo: SkillDoc[][];
+  if (hasCatalogData || !CATALOG_ALLOW_REMOTE_FALLBACK) {
+    perRepo = repos.map((repo) => cachedByRepo.get(repo.id) || []);
+  } else {
+    perRepo = await Promise.all(
+      repos.map(async (repo) => {
+        try {
+          return await collectSkillsFromRemote(repo);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Error desconocido';
+          console.error(`[skills:${repo.id}] Error inesperado: ${message}`);
+          return [];
+        }
+      })
+    );
+  }
 
   const allSkills = perRepo.flat();
+  const dedupedSkills = dedupeCatalogSkills(allSkills);
   aggregateSkillsCache = {
     key: cacheKey,
-    skills: allSkills,
+    skills: dedupedSkills,
     expiresAt: Date.now() + SKILLS_TTL_MS
   };
-  return allSkills;
+  return dedupedSkills;
+}
+
+function normalizeCatalogKey(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[^a-z0-9-_ ]+/g, '');
+}
+
+function buildCatalogDedupKey(skill: SkillDoc): string {
+  const title = normalizeCatalogKey(skill.title || '');
+  if (title) return `title:${title}`;
+
+  const name = normalizeCatalogKey(skill.name || '');
+  if (name) return `name:${name}`;
+
+  const description = normalizeCatalogKey((skill.description || '').slice(0, 180));
+  if (description) return `desc:${description}`;
+
+  const pathTail = normalizeCatalogKey(skill.sourcePath.split('/').slice(-2).join('/'));
+  return `path:${pathTail}`;
+}
+
+function compareSkillPriority(a: SkillDoc, b: SkillDoc): SkillDoc {
+  const statusWeight = (value: SkillDoc['status']): number => {
+    if (value === 'recommended') return 4;
+    if (value === 'stable') return 3;
+    if (value === 'draft') return 2;
+    return 1;
+  };
+
+  const aWeight = statusWeight(a.status);
+  const bWeight = statusWeight(b.status);
+  if (aWeight !== bWeight) return aWeight > bWeight ? a : b;
+
+  if (a.score !== b.score) return a.score > b.score ? a : b;
+  if (a.hasExamples !== b.hasExamples) return a.hasExamples ? a : b;
+  if (a.repoStars !== b.repoStars) return a.repoStars > b.repoStars ? a : b;
+
+  return a.repoName.localeCompare(b.repoName) <= 0 ? a : b;
+}
+
+function dedupeCatalogSkills(skills: SkillDoc[]): SkillDoc[] {
+  const byKey = new Map<string, SkillDoc>();
+
+  for (const skill of skills) {
+    const key = buildCatalogDedupKey(skill);
+    const previous = byKey.get(key);
+    if (!previous) {
+      byKey.set(key, skill);
+      continue;
+    }
+
+    byKey.set(key, compareSkillPriority(previous, skill));
+  }
+
+  return Array.from(byKey.values());
 }
 
 /**

@@ -1,8 +1,11 @@
 import type { APIRoute } from 'astro';
+import type { RepoConfig } from '../../../lib/config';
 import type { AnalyticsEventInput } from '../../../lib/services/types';
 import { upsertUser } from '../../../lib/services/users';
-import { getRepositoryById } from '../../../lib/services/repositories';
+import { getRepositoryById, upsertRepository } from '../../../lib/services/repositories';
 import { upsertSkill } from '../../../lib/services/skills';
+import { readReposConfig } from '../../../lib/config';
+import { parseRepoSlug } from '../../../lib/repo.service';
 import {
   insertLoginEvent,
   insertRepositoryView,
@@ -70,6 +73,63 @@ function summarizeEvent(event: AnalyticsEventInput): Record<string, unknown> {
     helpfulVote: event.payload.helpfulVote || null,
     hasSuggestion: Boolean(event.payload.suggestion?.trim())
   };
+}
+
+let repoConfigLookupPromise: Promise<Map<string, RepoConfig>> | null = null;
+
+async function getRepoConfigLookup(): Promise<Map<string, RepoConfig>> {
+  if (!repoConfigLookupPromise) {
+    repoConfigLookupPromise = readReposConfig().then((repos) => {
+      return repos.reduce<Map<string, RepoConfig>>((acc, repo) => {
+        acc.set(repo.id, repo);
+        return acc;
+      }, new Map<string, RepoConfig>());
+    });
+  }
+
+  return repoConfigLookupPromise;
+}
+
+function buildFullNameFromUrl(repoUrl: string): string {
+  const slug = parseRepoSlug(repoUrl);
+  if (!slug) return '';
+  return `${slug.owner}/${slug.name}`;
+}
+
+async function ensureRepositoryExists(
+  repositoryId: string,
+  payload: {
+    repositoryName?: string;
+    fullName?: string;
+    githubUrl?: string;
+    description?: string;
+  }
+): Promise<boolean> {
+  const existing = await getRepositoryById(repositoryId);
+  if (existing) return true;
+
+  const repoConfigLookup = await getRepoConfigLookup();
+  const config = repoConfigLookup.get(repositoryId);
+
+  const githubUrl = payload.githubUrl || config?.repoUrl || '';
+  const fullName = payload.fullName || (githubUrl ? buildFullNameFromUrl(githubUrl) : '') || repositoryId;
+  const repositoryName = payload.repositoryName || config?.name || fullName.split('/').pop() || repositoryId;
+
+  if (!githubUrl) {
+    return false;
+  }
+
+  await upsertRepository({
+    repository_id: repositoryId,
+    repository_name: repositoryName,
+    full_name: fullName,
+    github_url: githubUrl,
+    description: payload.description || config?.description || null,
+    is_active: true,
+    tags: config?.tags || []
+  });
+
+  return true;
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {
@@ -143,9 +203,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
 
       if (event.type === 'repository_view') {
-        const repository = await getRepositoryById(event.payload.repositoryId);
+        const repositoryExists = await ensureRepositoryExists(event.payload.repositoryId, {
+          repositoryName: event.payload.repositoryName,
+          fullName: event.payload.fullName,
+          githubUrl: event.payload.githubUrl,
+          description: event.payload.description
+        });
 
-        if (!repository) {
+        if (!repositoryExists) {
           console.warn('[analytics-ingest] repository_view skipped because repository does not exist', summarizeEvent(event));
           skippedDuplicates += 1;
           continue;
@@ -166,9 +231,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
 
       if (event.type === 'skill_view') {
-        const repository = await getRepositoryById(event.payload.repositoryId);
+        const repositoryExists = await ensureRepositoryExists(event.payload.repositoryId, {
+          repositoryName: event.payload.repositoryName,
+          fullName: event.payload.fullName,
+          githubUrl: event.payload.githubUrl,
+          description: event.payload.description
+        });
 
-        if (!repository) {
+        if (!repositoryExists) {
           console.warn('[analytics-ingest] skill_view skipped because repository does not exist', summarizeEvent(event));
           skippedDuplicates += 1;
           continue;
@@ -199,9 +269,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
 
       if (event.type === 'skill_feedback') {
-        const repository = await getRepositoryById(event.payload.repositoryId);
+        const repositoryExists = await ensureRepositoryExists(event.payload.repositoryId, {
+          repositoryName: event.payload.repositoryName,
+          fullName: event.payload.fullName,
+          githubUrl: event.payload.githubUrl,
+          description: event.payload.description
+        });
 
-        if (!repository) {
+        if (!repositoryExists) {
           console.warn('[analytics-ingest] skill_feedback skipped because repository does not exist', summarizeEvent(event));
           skippedDuplicates += 1;
           continue;

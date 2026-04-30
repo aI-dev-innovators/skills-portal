@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import { invalidateReposConfigCache } from '../../../lib/config';
 import { canManageRepositories } from '../../../lib/auth';
 import { deleteRepository, upsertRepository } from '../../../lib/services/repositories';
+import { invalidateSkillsCatalogCache } from '../../../lib/skill.service';
+import { invalidateCatalogByPrefix } from '../../../lib/cache/catalog-cache';
 
 export const prerender = false;
 
@@ -57,6 +59,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
       await deleteRepository(repositoryId);
       invalidateReposConfigCache();
+      invalidateSkillsCatalogCache(repositoryId);
+      invalidateCatalogByPrefix('repositories:');
+      invalidateCatalogByPrefix('skills:');
       return jsonResponse({ ok: true });
     }
 
@@ -88,6 +93,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
 
     invalidateReposConfigCache();
+    invalidateSkillsCatalogCache();
+    invalidateCatalogByPrefix('repositories:');
+    invalidateCatalogByPrefix('skills:');
     return jsonResponse({ ok: true, repository: saved });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'UnexpectedError';

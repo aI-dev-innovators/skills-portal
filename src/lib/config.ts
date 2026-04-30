@@ -31,6 +31,28 @@ export interface RepoConfig {
 
 const REPOS_CACHE_TTL_MS = 5 * 60 * 1000;
 let reposCache: { expiresAt: number; repos: RepoConfig[] } | null = null;
+function isTruthyFlag(value: string | undefined): boolean {
+  const normalized = (value || '').trim().toLowerCase();
+  return ['true', '1', 'yes', 'on'].includes(normalized);
+}
+
+const CATALOG_INCLUDE_LOCAL_REPOS = isTruthyFlag(process.env.CATALOG_INCLUDE_LOCAL_REPOS);
+
+function normalizeRepoIdentity(repoUrl: string): string {
+  const normalized = repoUrl.trim().toLowerCase();
+
+  const sshMatch = normalized.match(/github\.com:([^/]+)\/(.+?)(\.git)?$/);
+  if (sshMatch) {
+    return `${sshMatch[1]}/${sshMatch[2].replace(/\.git$/, '')}`;
+  }
+
+  const httpsMatch = normalized.match(/github\.com\/([^/]+)\/(.+?)(\.git)?$/);
+  if (httpsMatch) {
+    return `${httpsMatch[1]}/${httpsMatch[2].replace(/\.git$/, '')}`;
+  }
+
+  return normalized.replace(/\.git$/, '');
+}
 
 async function readLocalReposFromContent(): Promise<RepoConfig[]> {
   const reposRoot = path.resolve(process.cwd(), 'src/content/repos');
@@ -147,19 +169,37 @@ export async function readReposConfig(): Promise<RepoConfig[]> {
     skillsPath: 'skills',
     tags: tagsByRepository.get(repo.repository_id) || []
   }));
-
   const localRepos = await localReposPromise;
   const mergedById = new Map<string, RepoConfig>();
+  const mergedByIdentity = new Map<string, RepoConfig>();
 
-  for (const repo of localRepos) {
-    mergedById.set(repo.id, repo);
+  const useLocalRepos = CATALOG_INCLUDE_LOCAL_REPOS || repos.length === 0;
+
+  if (useLocalRepos) {
+    for (const repo of localRepos) {
+      mergedById.set(repo.id, repo);
+    }
   }
   for (const repo of repos) {
     mergedById.set(repo.id, repo);
   }
 
-  const mergedRepos = Array.from(mergedById.values()).sort((a, b) => a.name.localeCompare(b.name));
+  for (const repo of mergedById.values()) {
+    const identity = normalizeRepoIdentity(repo.repoUrl);
+    const previous = mergedByIdentity.get(identity);
 
+    if (!previous) {
+      mergedByIdentity.set(identity, repo);
+      continue;
+    }
+
+    const preferCurrent = repos.some((candidate) => candidate.id === repo.id);
+    if (preferCurrent) {
+      mergedByIdentity.set(identity, repo);
+    }
+  }
+
+  const mergedRepos = Array.from(mergedByIdentity.values()).sort((a, b) => a.name.localeCompare(b.name));
   reposCache = {
     repos: mergedRepos,
     expiresAt: Date.now() + REPOS_CACHE_TTL_MS
