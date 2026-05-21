@@ -2,14 +2,16 @@
 import Layout from '../layouts/Layout.astro';
 import { readReposConfig } from '../lib/config';
 import { collectAllSkills } from '../lib/skill.service';
-import { rankSkills, getPercentileRank, type SkillScore } from '../lib/ranking.service';
+import { getTopSkills, getPercentileRank, type SkillScore } from '../lib/ranking.service';
 import { getBadgeDefinition } from '../lib/badge.service';
 import type { BadgeType } from '../lib/badge.service';
 import type { SkillDoc } from '../lib/skill.service';
 
+const TOP_SKILLS_LIMIT = 10;
 const repos = await readReposConfig();
 const skills = await collectAllSkills(repos);
-const ranked = rankSkills(skills);
+const ranked = getTopSkills(skills, TOP_SKILLS_LIMIT);
+const displayedTop = Math.min(TOP_SKILLS_LIMIT, ranked.length);
 
 function formatScore(score: number): string {
   return (score * 100).toFixed(1);
@@ -50,7 +52,7 @@ function getBadgeHTML(badgeType: BadgeType) {
 
   <section class="ranking-section">
     <div class="ranking-header">
-      <p class="eyebrow">Top {ranked.length}</p>
+      <p class="eyebrow">Top {displayedTop}</p>
       <h2>Ranking de Skills</h2>
     </div>
 

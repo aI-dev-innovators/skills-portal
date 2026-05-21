@@ -4,6 +4,7 @@ import '../styles/global.css';
 const { title = 'Skills Portal', description = 'Portal interno de skills' } = Astro.props;
 const session = Astro.locals.session;
 const user = Astro.locals.user;
+const canManageRepositories = Astro.locals.canManageRepositories ?? false;
 const displayName = user?.name || user?.email || 'Usuario';
 const avatar = user?.image || null;
 const currentPath = Astro.url.pathname.replace(/\/+$/, '') || '/';
@@ -12,7 +13,8 @@ const navItems = [
   { href: '/', label: 'Inicio' },
   { href: '/skills', label: 'Skills' },
   { href: '/rankings', label: 'Rankings' },
-  { href: '/repos', label: 'Repos' }
+  { href: '/repos', label: 'Repos' },
+  ...(canManageRepositories ? [{ href: '/dashboard', label: 'Dashboard' }] : [])
 ];
 
 function isActivePath(href: string): boolean {

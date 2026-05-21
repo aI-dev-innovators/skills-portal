@@ -98,8 +98,6 @@ const skillCountCache = new Map<string, { expiresAt: number; count: number }>();
 const skillCountInFlight = new Map<string, Promise<number>>();
 let aggregateSkillsCache: { key: string; expiresAt: number; skills: SkillDoc[] } | null = null;
 const aggregateSkillsInFlight = new Map<string, Promise<SkillDoc[]>>();
-const CATALOG_ALLOW_REMOTE_FALLBACK =
-  (process.env.CATALOG_ALLOW_REMOTE_FALLBACK || 'false').trim().toLowerCase() === 'true';
 
 export function invalidateSkillsCatalogCache(repoId?: string): void {
   if (!repoId) {
@@ -826,29 +824,31 @@ async function countSkillsFromRemote(repo: RepoConfig): Promise<number> {
 
 export async function collectSkillCountsByRepo(repos: RepoConfig[]): Promise<Record<string, number>> {
   const dbCounts = await readSkillCountsByRepoFromDatabase(repos);
-  const hasCatalogData = Object.values(dbCounts).some((count) => count > 0);
-
-  if (hasCatalogData || !CATALOG_ALLOW_REMOTE_FALLBACK) {
+  const missingRepos = repos.filter((repo) => (dbCounts[repo.id] || 0) === 0);
+  if (missingRepos.length === 0) {
     return dbCounts;
   }
 
-  const results = await Promise.all(
-    repos.map(async (repo) => {
+  // Si hay conteos en cero, intentamos fallback remoto para evitar falsos 0 con catálogo parcial.
+  const fallbackResults = await Promise.all(
+    missingRepos.map(async (repo) => {
       try {
         const count = await countSkillsFromRemote(repo);
         return [repo.id, count] as const;
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Error desconocido';
         console.error(`[skills:${repo.id}] Error contando skills: ${message}`);
-        return [repo.id, 0] as const;
+        return [repo.id, dbCounts[repo.id] || 0] as const;
       }
     })
   );
 
-  return results.reduce<Record<string, number>>((acc, [repoId, count]) => {
-    acc[repoId] = count;
-    return acc;
-  }, {});
+  const mergedCounts = { ...dbCounts };
+  for (const [repoId, count] of fallbackResults) {
+    mergedCounts[repoId] = count;
+  }
+
+  return mergedCounts;
 }
 
 /**
@@ -886,24 +886,23 @@ export async function collectAllSkills(repos: RepoConfig[]): Promise<SkillDoc[]>
 
 async function collectAllSkillsInternal(repos: RepoConfig[], cacheKey: string): Promise<SkillDoc[]> {
   const cachedByRepo = await readCachedSkillsByRepoFromDatabase(repos);
-  const hasCatalogData = Array.from(cachedByRepo.values()).some((skills) => skills.length > 0);
+  const perRepo = await Promise.all(
+    repos.map(async (repo) => {
+      const cached = cachedByRepo.get(repo.id) || [];
+      if (cached.length > 0) {
+        return cached;
+      }
 
-  let perRepo: SkillDoc[][];
-  if (hasCatalogData || !CATALOG_ALLOW_REMOTE_FALLBACK) {
-    perRepo = repos.map((repo) => cachedByRepo.get(repo.id) || []);
-  } else {
-    perRepo = await Promise.all(
-      repos.map(async (repo) => {
-        try {
-          return await collectSkillsFromRemote(repo);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Error desconocido';
-          console.error(`[skills:${repo.id}] Error inesperado: ${message}`);
-          return [];
-        }
-      })
-    );
-  }
+      // Fallback por repositorio para evitar catálogos parciales con skills faltantes.
+      try {
+        return await collectSkillsFromRemote(repo);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Error desconocido';
+        console.error(`[skills:${repo.id}] Error inesperado: ${message}`);
+        return cached;
+      }
+    })
+  );
 
   const allSkills = perRepo.flat();
   const dedupedSkills = dedupeCatalogSkills(allSkills);

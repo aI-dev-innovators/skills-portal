@@ -1,0 +1,24 @@
+---
+interface Props {
+  id?: string;
+  hidden?: boolean;
+  title: string;
+  message: string;
+  titleId?: string;
+  messageId?: string;
+}
+
+const {
+  id,
+  hidden = false,
+  title,
+  message,
+  titleId,
+  messageId
+} = Astro.props;
+---
+
+<section id={id} class="empty-state" hidden={hidden}>
+  <h2 id={titleId}>{title}</h2>
+  <p id={messageId}>{message}</p>
+</section>

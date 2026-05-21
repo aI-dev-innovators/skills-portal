@@ -1,0 +1,23 @@
+---
+interface Props {
+  userLabel: string;
+  sessionLabel: string;
+}
+
+const { userLabel, sessionLabel } = Astro.props;
+---
+
+<section class="hero">
+  <div>
+    <p class="eyebrow">Dashboard</p>
+    <h1>KPIs del Catálogo de Skills</h1>
+    <p class="lede">Panel de control para visualizar la distribución del catálogo por tecnología, frente y repositorio. Los indicadores se calculan automáticamente usando la información disponible de cada skill.</p>
+    <p class="meta">Usuario: {userLabel} · Sesión: {sessionLabel}</p>
+  </div>
+  <div class="admin-actions">
+    <a class="admin-action admin-action--primary" href="/repos">Agregar repositorio</a>
+    <button class="admin-action admin-action--secondary" type="button" onclick="clearDashboardCache()">Limpiar cache</button>
+    <button class="admin-action admin-action--secondary" type="button" onclick="refreshDashboardMetrics()">Actualizar métricas</button>
+    <p class="admin-note" id="dashboard-admin-status">Tu correo tiene permisos de gestión para este dashboard.</p>
+  </div>
+</section>

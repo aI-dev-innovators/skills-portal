@@ -5,6 +5,7 @@ import { requireToken } from '../../lib/github.service';
 import { collectAllSkills } from '../../lib/skill.service';
 import { getBadgeDefinition } from '../../lib/badge.service';
 
+const canManageRepositories = Astro.locals.canManageRepositories ?? false;
 requireToken();
 const repos = await readReposConfig();
 const skills = (await collectAllSkills(repos)).sort((a, b) => a.title.localeCompare(b.title));
@@ -168,6 +169,12 @@ const CARD_ASSET_LIMIT = 3;
     <div class="results-actions">
       <p id="results-count" aria-live="polite">{totalSkills} skills visibles</p>
       <a class="excel-export" href="/api/skills-export/" download>Descargar Excel consolidado</a>
+      {canManageRepositories && (
+        <>
+          <button class="excel-export admin-cache-clear" type="button" onclick="clearSkillsCache()">Limpiar cache skills</button>
+          <p id="skills-admin-status" class="admin-status" aria-live="polite">Tu correo tiene permisos de gestión para este catálogo.</p>
+        </>
+      )}
     </div>
   </section>
 
@@ -605,6 +612,16 @@ const CARD_ASSET_LIMIT = 3;
       color: var(--nav-active-text);
     }
 
+    .admin-cache-clear {
+      cursor: pointer;
+    }
+
+    .admin-status {
+      color: var(--muted);
+      font-size: 0.82rem;
+      max-width: 360px;
+    }
+
     .skills-grid {
       margin-top: 0.85rem;
       display: grid;
@@ -908,6 +925,7 @@ const CARD_ASSET_LIMIT = 3;
   <script>
     const grid = document.getElementById('skills-grid');
     const resultsCount = document.getElementById('results-count');
+    const skillsAdminStatus = document.getElementById('skills-admin-status') as HTMLParagraphElement | null;
     const paginationStatus = document.getElementById('pagination-status');
     const paginationPrev = document.getElementById('pagination-prev');
     const paginationNext = document.getElementById('pagination-next');
@@ -1087,6 +1105,40 @@ const CARD_ASSET_LIMIT = 3;
       filterSkills();
     }
 
+    async function clearSkillsCache(): Promise<void> {
+      const confirmed = window.confirm('Se limpiará la cache del catálogo de skills y repos. ¿Deseas continuar?');
+      if (!confirmed) return;
+
+      if (skillsAdminStatus) {
+        skillsAdminStatus.textContent = 'Limpiando cache...';
+      }
+
+      try {
+        const response = await fetch('/api/admin/cache-clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(String((data as { error?: string }).error || 'No se pudo limpiar la cache'));
+        }
+
+        if (skillsAdminStatus) {
+          skillsAdminStatus.textContent = 'Cache limpiada. Recargando resultados...';
+        }
+
+        window.location.reload();
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Error inesperado';
+        if (skillsAdminStatus) {
+          skillsAdminStatus.textContent = message;
+        } else {
+          window.alert(message);
+        }
+      }
+    }
+
     filterSkills();
 
     // @ts-ignore
@@ -1097,5 +1149,7 @@ const CARD_ASSET_LIMIT = 3;
     window.goToPreviousPage = goToPreviousPage;
     // @ts-ignore
     window.goToNextPage = goToNextPage;
+    // @ts-ignore
+    window.clearSkillsCache = clearSkillsCache;
   </script>
 </Layout>

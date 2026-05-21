@@ -9,6 +9,10 @@ const canManageRepositories = Astro.locals.canManageRepositories ?? false;
 const repos = (await readReposConfig()).sort((a, b) => a.name.localeCompare(b.name));
 const totalRepos = repos.length;
 const skillsPerRepo = await collectSkillCountsByRepo(repos);
+const totalSkillsAcrossRepos = repos.reduce(
+  (acc, repo) => acc + (skillsPerRepo[repo.id] || skillsPerRepo[repo.name] || 0),
+  0
+);
 const tagOptions = Array.from(new Set(repos.flatMap((r) => r.tags || []))).sort();
 const repoRows = await Promise.all(
   repos.map(async (repo) => {
@@ -38,6 +42,10 @@ function formatShortDate(value: string | null): string {
         <div class="stat">
           <span class="stat-label">Repos registrados</span>
           <span class="stat-value">{totalRepos}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Skills totales</span>
+          <span class="stat-value">{totalSkillsAcrossRepos}</span>
         </div>
         <div class="stat">
           <span class="stat-label">Fetch en vivo</span>
@@ -83,8 +91,10 @@ function formatShortDate(value: string | null): string {
     <div class="repo-list" id="repo-list">
       {repoRows.map(({ repo, metrics }) => {
         const tagString = (repo.tags || []).join(' ').toLowerCase();
-        const hasSkills = (skillsPerRepo[repo.id] || skillsPerRepo[repo.name] || 0) > 0;
+        const skillsCount = skillsPerRepo[repo.id] || skillsPerRepo[repo.name] || 0;
+        const hasSkills = skillsCount > 0;
         const status = hasSkills ? 'with' : 'without';
+        const skillsLabel = `${skillsCount} skill${skillsCount === 1 ? '' : 's'}`;
         return (
           <article
             class="repo-row"
@@ -101,7 +111,7 @@ function formatShortDate(value: string | null): string {
                   {(repo.tags || []).map((tag) => (
                     <span class="tag">{tag}</span>
                   ))}
-                  <span class="tag" style="opacity:0.8">{hasSkills ? 'Con skills' : 'Solo README'}</span>
+                  <span class="tag" title="Cantidad de skills asociadas al repositorio">{skillsLabel}</span>
                 </div>
                 <div class="metrics-row">
                   <span class="metric">★ {metrics.stars}</span>
@@ -645,7 +655,15 @@ function formatShortDate(value: string | null): string {
               <input id="repo-admin-original-id" name="original_repository_id" type="hidden" />
             <label class="admin-field admin-field--full">
               <span>URL del repositorio</span>
-              <input id="repo-admin-url" name="github_url" type="url" placeholder="https://github.com/owner/private-skills-cli" required />
+              <input
+                id="repo-admin-url"
+                name="github_url"
+                type="text"
+                placeholder="https://github.com/owner/private-skills-cli o git@github.com:owner/private-skills-cli.git"
+                pattern="^(https://github\\.com/[^\\s/]+/[^\\s/]+(?:\\.git)?/?|git@github\\.com:[^\\s/]+/[^\\s/]+(?:\\.git)?)$"
+                title="Usa una URL HTTPS de GitHub o ruta SSH (ej: git@github.com:owner/repo.git)."
+                required
+              />
             </label>
             <label class="admin-field admin-field--full">
               <span>Descripción</span>
@@ -722,6 +740,20 @@ function formatShortDate(value: string | null): string {
     const repoConfirmModalSubmit = document.getElementById('repo-confirm-modal-submit') as HTMLButtonElement | null;
 
     let repoConfirmResolver: ((confirmed: boolean) => void) | null = null;
+
+    function parseFullNameFromRepoUrl(repoUrl: string): string {
+      const sshMatch = repoUrl.match(/^git@github\.com:([^/\s]+)\/([^\s]+?)(?:\.git)?$/i);
+      if (sshMatch) {
+        return `${sshMatch[1]}/${sshMatch[2]}`;
+      }
+
+      const httpsMatch = repoUrl.match(/^https:\/\/github\.com\/([^/\s]+)\/([^\s]+?)(?:\.git)?\/?$/i);
+      if (httpsMatch) {
+        return `${httpsMatch[1]}/${httpsMatch[2]}`;
+      }
+
+      return '';
+    }
 
     function setRepoAdminMode(mode: 'create' | 'edit'): void {
       if (repoAdminForm) {
@@ -861,11 +893,12 @@ function formatShortDate(value: string | null): string {
       }
 
       if (action === 'edit') {
+        const repoUrl = target?.dataset?.repoUrl || '';
         openRepoAdminModal('edit', {
           id: target?.dataset?.repoId,
           name: target?.dataset?.repoName,
-          fullName: target?.dataset?.repoUrl ? target.dataset.repoUrl.replace(/^https:\/\/github\.com\//, '') : '',
-          url: target?.dataset?.repoUrl,
+          fullName: parseFullNameFromRepoUrl(repoUrl),
+          url: repoUrl,
           description: target?.dataset?.repoDescription,
           tags: target?.dataset?.repoTags,
           isActive: true

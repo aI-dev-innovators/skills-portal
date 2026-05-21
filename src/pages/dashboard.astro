@@ -1,16 +1,1510 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { readReposConfig } from '../lib/config';
+import { collectAllSkills, type SkillDoc } from '../lib/skill.service';
+import DashboardHero from '../components/dashboard/DashboardHero.astro';
+import DashboardEmptyState from '../components/dashboard/DashboardEmptyState.astro';
+import DashboardKpiSections from '../components/dashboard/DashboardKpiSections.astro';
+import DashboardFilters from '../components/dashboard/DashboardFilters.astro';
+import DashboardDistributionPanels from '../components/dashboard/DashboardDistributionPanels.astro';
+import DashboardSkillsTable from '../components/dashboard/DashboardSkillsTable.astro';
 
 export const prerender = false;
 
 const user = Astro.locals.user;
 const session = Astro.locals.session;
+const canManageRepositories = Astro.locals.canManageRepositories ?? false;
+
+if (!canManageRepositories) {
+  Astro.response.status = 403;
+}
+
+type FrontLabel =
+  | 'Frontend'
+  | 'Backend'
+  | 'DevOps'
+  | 'Security'
+  | 'Cloud'
+  | 'Data'
+  | 'QA'
+  | 'AI'
+  | 'Mobile'
+  | 'Otros';
+
+interface DashboardSkillRecord {
+  id: string;
+  title: string;
+  url: string;
+  front: FrontLabel;
+  technologies: string[];
+  repoId: string;
+  repoName: string;
+  status: 'Activa' | 'Inactiva';
+  createdAt: string;
+}
+
+const FRONTS: FrontLabel[] = [
+  'Frontend',
+  'Backend',
+  'DevOps',
+  'Security',
+  'Cloud',
+  'Data',
+  'QA',
+  'AI',
+  'Mobile',
+  'Otros'
+];
+
+const FRONT_KEYWORDS: Record<Exclude<FrontLabel, 'Otros'>, string[]> = {
+  Frontend: ['frontend', 'angular', 'react', 'vue', 'next.js', 'nextjs', 'html', 'css', 'ui', 'ux', 'microfrontend'],
+  Backend: ['backend', 'api', 'nestjs', 'node.js', 'nodejs', 'java', 'spring', 'microservicio', 'graphql', 'rest'],
+  DevOps: ['devops', 'ci/cd', 'pipeline', 'docker', 'kubernetes', 'terraform', 'helm', 'jenkins', 'github actions'],
+  Security: ['security', 'seguridad', 'owasp', 'iam', 'sast', 'dast', 'vulnerabilidad', 'autenticacion', 'auth'],
+  Cloud: ['cloud', 'aws', 'azure', 'gcp', 'serverless', 'networking', 'storage', 'infraestructura'],
+  Data: ['data', 'analytics', 'sql', 'etl', 'databricks', 'bigquery', 'database', 'reporting'],
+  QA: ['qa', 'testing', 'test', 'selenium', 'cypress', 'playwright', 'junit', 'mock'],
+  AI: ['ai', 'ia', 'llm', 'rag', 'prompt', 'genai', 'machine learning', 'openai', 'agent'],
+  Mobile: ['mobile', 'android', 'ios', 'flutter', 'react native', 'kotlin', 'swift']
+};
+
+const TECHNOLOGY_KEYWORDS: Record<string, string[]> = {
+  Java: ['java'],
+  'Spring Boot': ['spring boot', 'spring'],
+  Angular: ['angular'],
+  React: ['react'],
+  Vue: ['vue'],
+  'Next.js': ['next.js', 'nextjs'],
+  'Node.js': ['node.js', 'nodejs', 'nestjs'],
+  TypeScript: ['typescript'],
+  JavaScript: ['javascript'],
+  Python: ['python'],
+  Docker: ['docker'],
+  Kubernetes: ['kubernetes', 'k8s'],
+  Terraform: ['terraform'],
+  Helm: ['helm'],
+  Jenkins: ['jenkins'],
+  'GitHub Actions': ['github actions'],
+  GraphQL: ['graphql'],
+  REST: ['rest'],
+  AWS: ['aws'],
+  Azure: ['azure'],
+  GCP: ['gcp', 'google cloud'],
+  Databricks: ['databricks'],
+  BigQuery: ['bigquery'],
+  SQL: ['sql'],
+  Playwright: ['playwright'],
+  Cypress: ['cypress'],
+  Selenium: ['selenium'],
+  JUnit: ['junit'],
+  OpenAI: ['openai'],
+  RAG: ['rag'],
+  LLM: ['llm'],
+  Flutter: ['flutter'],
+  'React Native': ['react native'],
+  Kotlin: ['kotlin'],
+  Swift: ['swift']
+};
+
+function normalize(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s./_-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function toStatusLabel(status: SkillDoc['status']): 'Activa' | 'Inactiva' {
+  return status === 'deprecated' ? 'Inactiva' : 'Activa';
+}
+
+function toDateLabel(value: string | null): string {
+  if (!value) return 'N/D';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'N/D';
+  return parsed.toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+}
+
+function detectFront(skill: SkillDoc): FrontLabel {
+  const explicitTokens = [...(skill.tags || []), ...(skill.frameworks || [])].map((item) => normalize(item));
+
+  const directMatch = FRONTS.find((front) => {
+    if (front === 'Otros') return false;
+    return explicitTokens.some((token) => FRONT_KEYWORDS[front].includes(token));
+  });
+
+  if (directMatch) return directMatch;
+
+  const index = normalize([
+    skill.title,
+    skill.name,
+    skill.description,
+    skill.repoName,
+    skill.repoId,
+    ...(skill.tags || []),
+    ...(skill.frameworks || [])
+  ].join(' '));
+
+  let bestFront: FrontLabel = 'Otros';
+  let bestScore = 0;
+
+  for (const front of FRONTS) {
+    if (front === 'Otros') continue;
+    let score = 0;
+    for (const keyword of FRONT_KEYWORDS[front]) {
+      if (index.includes(normalize(keyword))) score += 1;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestFront = front;
+    }
+  }
+
+  return bestScore > 0 ? bestFront : 'Otros';
+}
+
+function detectTechnologies(skill: SkillDoc): string[] {
+  const fromFrameworks = (skill.frameworks || [])
+    .map((framework) => framework.trim())
+    .filter(Boolean)
+    .map((framework) => {
+      const normalized = normalize(framework);
+      if (normalized === 'node') return 'Node.js';
+      if (normalized === 'react-native') return 'React Native';
+      return framework;
+    });
+
+  const index = normalize([
+    skill.title,
+    skill.name,
+    skill.description,
+    skill.repoName,
+    skill.repoId,
+    ...(skill.tags || []),
+    ...(skill.frameworks || [])
+  ].join(' '));
+
+  const detected = new Set<string>(fromFrameworks);
+  for (const [technology, keywords] of Object.entries(TECHNOLOGY_KEYWORDS)) {
+    for (const keyword of keywords) {
+      if (index.includes(normalize(keyword))) {
+        detected.add(technology);
+        break;
+      }
+    }
+  }
+
+  return Array.from(detected).sort((a, b) => a.localeCompare(b));
+}
+
+const repos = await readReposConfig();
+const skills = await collectAllSkills(repos);
+
+const dashboardSkills: DashboardSkillRecord[] = skills.map((skill) => ({
+  id: skill.id,
+  title: skill.title,
+  url: skill.url,
+  front: detectFront(skill),
+  technologies: detectTechnologies(skill),
+  repoId: skill.repoId,
+  repoName: skill.repoName,
+  status: toStatusLabel(skill.status),
+  createdAt: toDateLabel(skill.lastUpdated)
+}));
+
+const dashboardData = {
+  skills: dashboardSkills,
+  fronts: FRONTS,
+  repositories: repos.map((repo) => ({ id: repo.id, name: repo.name }))
+};
 ---
 
-<Layout title="Dashboard" description="Panel de sesión">
-  <section style="display:grid;gap:1rem;max-width:720px;">
-    <h1>Dashboard</h1>
-    <p>Usuario: {user?.name ?? user?.email ?? 'No autenticado'}</p>
-    <p>Sesion: {session ? 'Activa' : 'Inactiva'}</p>
-  </section>
+<Layout title="Dashboard" description="KPIs del catálogo de skills">
+  <div class="dashboard-page">
+  {canManageRepositories ? (
+    <>
+      <DashboardHero
+        userLabel={user?.name ?? user?.email ?? 'No autenticado'}
+        sessionLabel={session ? 'Activa' : 'Inactiva'}
+      />
+
+      <DashboardEmptyState
+        id="empty-state-global"
+        hidden={true}
+        title="Sin datos"
+        message="Aún no hay información para mostrar."
+        titleId="empty-state-title"
+        messageId="empty-state-message"
+      />
+
+      <section id="dashboard-content">
+        <DashboardKpiSections />
+        <DashboardFilters />
+        <DashboardDistributionPanels />
+        <DashboardSkillsTable />
+      </section>
+
+      <script id="dashboard-data" type="application/json">{JSON.stringify(dashboardData)}</script>
+
+      <script>
+        // @ts-nocheck
+        const dashboardAdminStatus = document.getElementById('dashboard-admin-status');
+        const payloadNode = document.getElementById('dashboard-data');
+        const frontFilter = document.getElementById('filter-front');
+        const techFilter = document.getElementById('filter-tech');
+        const repoFilter = document.getElementById('filter-repo');
+        const frontDistributionNode = document.getElementById('front-distribution');
+        const technologyRankingNode = document.getElementById('technology-ranking');
+        const repoRankingNode = document.getElementById('repo-ranking');
+        const frontDonutChartNode = document.getElementById('front-donut-chart');
+        const techBarsChartNode = document.getElementById('tech-bars-chart');
+        const tableBodyNode = document.getElementById('skills-table-body');
+        const tableEmptyNode = document.getElementById('table-empty');
+        const showAllTechButton = document.getElementById('show-all-tech');
+        const dashboardContent = document.getElementById('dashboard-content');
+        const emptyStateGlobal = document.getElementById('empty-state-global');
+        const emptyStateTitle = document.getElementById('empty-state-title');
+        const emptyStateMessage = document.getElementById('empty-state-message');
+
+        const kpiTotalSkills = document.getElementById('kpi-total-skills');
+        const kpiActiveRepos = document.getElementById('kpi-active-repos');
+        const kpiTotalFronts = document.getElementById('kpi-total-fronts');
+        const kpiTotalTech = document.getElementById('kpi-total-tech');
+        const kpiTopFront = document.getElementById('kpi-top-front');
+        const kpiTopFrontHelp = document.getElementById('kpi-top-front-help');
+        const kpiTopTech = document.getElementById('kpi-top-tech');
+        const kpiTopTechHelp = document.getElementById('kpi-top-tech-help');
+        const kpiTopRepo = document.getElementById('kpi-top-repo');
+        const kpiTopRepoHelp = document.getElementById('kpi-top-repo-help');
+        const kpiLowFront = document.getElementById('kpi-low-front');
+        const kpiLowFrontHelp = document.getElementById('kpi-low-front-help');
+        const kpiMeterSkills = document.getElementById('kpi-meter-skills');
+        const kpiMeterRepos = document.getElementById('kpi-meter-repos');
+        const kpiMeterFronts = document.getElementById('kpi-meter-fronts');
+        const kpiMeterTech = document.getElementById('kpi-meter-tech');
+
+        const payload = payloadNode && payloadNode.textContent
+          ? JSON.parse(payloadNode.textContent)
+          : { skills: [], fronts: [], repositories: [] };
+
+        const allSkills = payload.skills || [];
+        const allFronts = payload.fronts || [];
+        const allRepositories = payload.repositories || [];
+        let showAllTechnologies = false;
+
+        function toPercent(count, total) {
+          if (total <= 0) return 0;
+          return Math.round((count / total) * 100);
+        }
+
+        function buildRankingMap(values) {
+          const counts = new Map();
+          values.forEach((value) => {
+            if (!value) return;
+            counts.set(value, (counts.get(value) || 0) + 1);
+          });
+
+          const total = values.length;
+          return Array.from(counts.entries())
+            .map(([key, count]) => ({ key, count, percent: toPercent(count, total) }))
+            .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+        }
+
+        function computeSummary(rows) {
+          const frontRanking = buildRankingMap(rows.map((row) => row.front));
+          const techRanking = buildRankingMap(rows.flatMap((row) => row.technologies || []));
+          const repoRanking = buildRankingMap(rows.map((row) => row.repoName || row.repoId));
+
+          const lowCandidates = frontRanking.filter((item) => item.count > 0);
+          const lowFront = lowCandidates.length
+            ? lowCandidates.reduce((prev, current) => (current.count < prev.count ? current : prev), lowCandidates[0])
+            : null;
+
+          return {
+            totalSkills: rows.length,
+            activeRepos: allRepositories.length,
+            frontDetected: frontRanking.length,
+            technologiesDetected: techRanking.length,
+            frontRanking,
+            techRanking,
+            repoRanking,
+            topFront: frontRanking[0] || null,
+            topTech: techRanking[0] || null,
+            topRepo: repoRanking[0] || null,
+            lowFront
+          };
+        }
+
+        function renderKpis(summary) {
+          if (kpiTotalSkills) kpiTotalSkills.textContent = String(summary.totalSkills);
+          if (kpiActiveRepos) kpiActiveRepos.textContent = String(summary.activeRepos);
+          if (kpiTotalFronts) kpiTotalFronts.textContent = String(summary.frontDetected);
+          if (kpiTotalTech) kpiTotalTech.textContent = String(summary.technologiesDetected);
+
+          const maxSkills = Math.max(allSkills.length, 1);
+          const maxRepos = Math.max(allRepositories.length, 1);
+          const maxFronts = Math.max(allFronts.length, 1);
+          const allTechCount = Array.from(new Set(allSkills.flatMap((row) => row.technologies || []))).length;
+          const maxTech = Math.max(allTechCount, 1);
+
+          if (kpiMeterSkills) kpiMeterSkills.style.width = `${Math.max(8, Math.round((summary.totalSkills / maxSkills) * 100))}%`;
+          if (kpiMeterRepos) kpiMeterRepos.style.width = `${Math.max(8, Math.round((summary.activeRepos / maxRepos) * 100))}%`;
+          if (kpiMeterFronts) kpiMeterFronts.style.width = `${Math.max(8, Math.round((summary.frontDetected / maxFronts) * 100))}%`;
+          if (kpiMeterTech) kpiMeterTech.style.width = `${Math.max(8, Math.round((summary.technologiesDetected / maxTech) * 100))}%`;
+
+          if (kpiTopFront) kpiTopFront.textContent = summary.topFront ? summary.topFront.key : '-';
+          if (kpiTopFrontHelp) kpiTopFrontHelp.textContent = summary.topFront ? `${summary.topFront.count} skills registradas` : '0 skills registradas';
+
+          if (kpiTopTech) kpiTopTech.textContent = summary.topTech ? summary.topTech.key : '-';
+          if (kpiTopTechHelp) kpiTopTechHelp.textContent = summary.topTech ? `${summary.topTech.count} skills asociadas` : '0 skills asociadas';
+
+          if (kpiTopRepo) kpiTopRepo.textContent = summary.topRepo ? summary.topRepo.key : '-';
+          if (kpiTopRepoHelp) kpiTopRepoHelp.textContent = summary.topRepo ? `${summary.topRepo.count} skills publicadas` : '0 skills publicadas';
+
+          if (kpiLowFront) kpiLowFront.textContent = summary.lowFront ? summary.lowFront.key : '-';
+          if (kpiLowFrontHelp) kpiLowFrontHelp.textContent = summary.lowFront ? `${summary.lowFront.count} skills registradas` : '0 skills registradas';
+        }
+
+        function renderFrontDonut(summary) {
+          if (!frontDonutChartNode) return;
+          const top = summary.frontRanking.slice(0, 5);
+          if (!top.length) {
+            frontDonutChartNode.innerHTML = '<p class="empty-inline">Sin datos para gráfico por frente.</p>';
+            return;
+          }
+
+          const colors = ['#22c7b6', '#4e88ff', '#ffad49', '#ef6f8c', '#8f7dff'];
+          const radius = 46;
+          const cx = 62;
+          const cy = 62;
+          const circumference = 2 * Math.PI * radius;
+
+          let offset = 0;
+          const arcs = top.map((item, index) => {
+            const segment = (item.percent / 100) * circumference;
+            const dashArray = `${segment} ${circumference - segment}`;
+            const dashOffset = -offset;
+            offset += segment;
+            return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${colors[index % colors.length]}" stroke-width="14" stroke-linecap="butt" stroke-dasharray="${dashArray}" stroke-dashoffset="${dashOffset}"></circle>`;
+          }).join('');
+
+          const legend = top.map((item, index) => `
+            <li>
+              <span class="dot" style="background:${colors[index % colors.length]}"></span>
+              <span>${item.key}</span>
+              <strong>${item.percent}%</strong>
+            </li>
+          `).join('');
+
+          frontDonutChartNode.innerHTML = `
+            <div class="donut-wrap">
+              <svg viewBox="0 0 124 124" aria-hidden="true" focusable="false">
+                <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="color-mix(in srgb, var(--panel) 65%, var(--border))" stroke-width="14"></circle>
+                ${arcs}
+                <text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" class="donut-label">${summary.totalSkills}</text>
+              </svg>
+              <ul class="donut-legend">${legend}</ul>
+            </div>
+          `;
+        }
+
+        function renderTechBarsChart(summary) {
+          if (!techBarsChartNode) return;
+          const top = summary.techRanking.slice(0, 6);
+          if (!top.length) {
+            techBarsChartNode.innerHTML = '<p class="empty-inline">Sin datos para gráfico de tecnologías.</p>';
+            return;
+          }
+
+          const maxCount = Math.max(...top.map((item) => item.count), 1);
+          techBarsChartNode.innerHTML = top.map((item) => {
+            const percent = Math.round((item.count / maxCount) * 100);
+            return `
+              <div class="tech-bar-row">
+                <p>${item.key}</p>
+                <div class="tech-bar-track"><span style="width:${Math.max(10, percent)}%"></span></div>
+                <strong>${item.count}</strong>
+              </div>
+            `;
+          }).join('');
+        }
+
+        function renderDistribution(summary) {
+          if (!frontDistributionNode) return;
+
+          frontDistributionNode.innerHTML = summary.frontRanking.map((item) => {
+            const width = Math.max(item.percent, 4);
+            return `
+              <button class="list-row" type="button" data-front="${item.key}">
+                <div class="list-row__head">
+                  <span>${item.key}</span>
+                  <strong>${item.count} skills · ${item.percent}%</strong>
+                </div>
+                <div class="list-row__bar"><span style="width:${width}%;"></span></div>
+              </button>
+            `;
+          }).join('') || '<p class="empty-inline">Sin datos para distribución por frente.</p>';
+
+          frontDistributionNode.querySelectorAll('button[data-front]').forEach((button) => {
+            button.addEventListener('click', () => {
+              if (!frontFilter) return;
+              frontFilter.value = button.dataset.front || '';
+              applyDashboardFilters();
+            });
+          });
+        }
+
+        function renderTechnologyRanking(summary) {
+          if (!technologyRankingNode) return;
+          const list = showAllTechnologies ? summary.techRanking : summary.techRanking.slice(0, 10);
+
+          technologyRankingNode.innerHTML = list.map((item) => `
+            <button class="list-row list-row--compact" type="button" data-tech="${item.key}">
+              <span>${item.key}</span>
+              <strong>${item.count} skills</strong>
+            </button>
+          `).join('') || '<p class="empty-inline">Sin tecnologías para este filtro.</p>';
+
+          if (showAllTechButton) {
+            const hasOverflow = summary.techRanking.length > 10;
+            showAllTechButton.hidden = !hasOverflow;
+            showAllTechButton.textContent = showAllTechnologies ? 'Ver top 10' : 'Ver todas';
+          }
+
+          technologyRankingNode.querySelectorAll('button[data-tech]').forEach((button) => {
+            button.addEventListener('click', () => {
+              if (!techFilter) return;
+              techFilter.value = button.dataset.tech || '';
+              applyDashboardFilters();
+            });
+          });
+        }
+
+        function renderRepositoryRanking(summary) {
+          if (!repoRankingNode) return;
+
+          repoRankingNode.innerHTML = summary.repoRanking.map((item) => `
+            <button class="list-row list-row--compact" type="button" data-repo="${item.key}">
+              <span>${item.key}</span>
+              <strong>${item.count} skills</strong>
+            </button>
+          `).join('') || '<p class="empty-inline">Sin repositorios para este filtro.</p>';
+
+          repoRankingNode.querySelectorAll('button[data-repo]').forEach((button) => {
+            button.addEventListener('click', () => {
+              if (!repoFilter) return;
+              repoFilter.value = button.dataset.repo || '';
+              applyDashboardFilters();
+            });
+          });
+        }
+
+        function renderTable(rows) {
+          if (!tableBodyNode) return;
+
+          if (!rows.length) {
+            tableBodyNode.innerHTML = '';
+            if (tableEmptyNode) tableEmptyNode.hidden = false;
+            return;
+          }
+
+          if (tableEmptyNode) tableEmptyNode.hidden = true;
+
+          const repoCounts = rows.reduce((acc, row) => {
+            const key = row.repoName || row.repoId;
+            acc.set(key, (acc.get(key) || 0) + 1);
+            return acc;
+          }, new Map());
+          const maxTechPerSkill = Math.max(1, ...rows.map((row) => (row.technologies || []).length));
+
+          tableBodyNode.innerHTML = rows.map((row) => {
+            const technologies = row.technologies && row.technologies.length
+              ? row.technologies.map((tech) => `<span class="badge badge--tech">${tech}</span>`).join(' ')
+              : '<span class="badge badge--tech">N/D</span>';
+
+            const frontClass = `badge badge--front badge--${row.front.toLowerCase().replace(/[^a-z]+/g, '-')}`;
+            const statusClass = row.status === 'Activa' ? 'badge badge--status-active' : 'badge badge--status-inactive';
+            const repoKey = row.repoName || row.repoId;
+            const repoCount = repoCounts.get(repoKey) || 0;
+            const repoShare = toPercent(repoCount, rows.length);
+            const techCount = (row.technologies || []).length;
+            const techDepth = Math.round((techCount / maxTechPerSkill) * 100);
+
+            return `
+              <tr>
+                <td><a href="${row.url}">${row.title}</a></td>
+                <td><span class="${frontClass}">${row.front}</span></td>
+                <td>${technologies}</td>
+                <td>${row.repoName || row.repoId}</td>
+                <td>
+                  <div class="row-metrics">
+                    <div class="row-metric">
+                      <span>Share repo</span>
+                      <div class="mini-track"><span style="width:${Math.max(8, repoShare)}%"></span></div>
+                      <strong>${repoShare}%</strong>
+                    </div>
+                    <div class="row-metric">
+                      <span>Mix tech</span>
+                      <div class="mini-track mini-track--tech"><span style="width:${Math.max(8, techDepth)}%"></span></div>
+                      <strong>${techCount}</strong>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="${statusClass}">${row.status}</span></td>
+                <td>${row.createdAt}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+
+        function applyDashboardFilters() {
+          const selectedFront = frontFilter ? frontFilter.value : '';
+          const selectedTechnology = techFilter ? techFilter.value : '';
+          const selectedRepository = repoFilter ? repoFilter.value : '';
+
+          const filtered = allSkills.filter((row) => {
+            const frontOk = !selectedFront || row.front === selectedFront;
+            const technologyOk = !selectedTechnology || (row.technologies || []).includes(selectedTechnology);
+            const repositoryOk = !selectedRepository || row.repoName === selectedRepository;
+            return frontOk && technologyOk && repositoryOk;
+          });
+
+          const summary = computeSummary(filtered);
+          renderKpis(summary);
+          renderDistribution(summary);
+          renderFrontDonut(summary);
+          renderTechBarsChart(summary);
+          renderTechnologyRanking(summary);
+          renderRepositoryRanking(summary);
+          renderTable(filtered);
+        }
+
+        function clearDashboardFilters() {
+          if (frontFilter) frontFilter.value = '';
+          if (techFilter) techFilter.value = '';
+          if (repoFilter) repoFilter.value = '';
+          showAllTechnologies = false;
+          applyDashboardFilters();
+        }
+
+        async function clearDashboardCache() {
+          const confirmed = window.confirm('Se limpiará la cache del catálogo. ¿Deseas continuar?');
+          if (!confirmed) return;
+
+          const trigger = document.querySelector('button[onclick="clearDashboardCache()"]');
+          if (trigger) trigger.disabled = true;
+
+          if (dashboardAdminStatus) {
+            dashboardAdminStatus.textContent = 'Limpiando cache...';
+          }
+
+          try {
+            const response = await fetch('/api/admin/cache-clear', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(String(data.error || 'No se pudo limpiar la cache'));
+            }
+
+            if (dashboardAdminStatus) {
+              dashboardAdminStatus.textContent = 'Cache limpiada. Recargando dashboard...';
+            }
+
+            window.location.reload();
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Error inesperado';
+            if (dashboardAdminStatus) {
+              dashboardAdminStatus.textContent = message;
+            } else {
+              window.alert(message);
+            }
+          } finally {
+            if (trigger) trigger.disabled = false;
+          }
+        }
+
+        function refreshDashboardMetrics() {
+          applyDashboardFilters();
+          if (dashboardAdminStatus) {
+            dashboardAdminStatus.textContent = 'Métricas actualizadas correctamente.';
+          }
+        }
+
+        function initializeOptions() {
+          setSelectOptions(
+            frontFilter,
+            allFronts.map((front) => ({ value: front, label: front })),
+            'Todos los frentes'
+          );
+
+          const technologies = Array.from(new Set(allSkills.flatMap((row) => row.technologies || []))).sort((a, b) => a.localeCompare(b));
+          setSelectOptions(
+            techFilter,
+            technologies.map((technology) => ({ value: technology, label: technology })),
+            'Todas las tecnologías'
+          );
+
+          const repositoryOptions = allRepositories
+            .map((repo) => ({ value: repo.name, label: repo.name }))
+            .sort((a, b) => a.label.localeCompare(b.label));
+          setSelectOptions(repoFilter, repositoryOptions, 'Todos los repositorios');
+        }
+
+        function setSelectOptions(select, options, defaultLabel) {
+          if (!select) return;
+          select.innerHTML = [`<option value="">${defaultLabel}</option>`]
+            .concat(options.map((opt) => `<option value="${opt.value}">${opt.label}</option>`))
+            .join('');
+        }
+
+        function bootstrapDashboard() {
+          const hasSkills = allSkills.length > 0;
+          const hasRepos = allRepositories.length > 0;
+
+          if (!hasSkills || !hasRepos) {
+            if (dashboardContent) dashboardContent.hidden = true;
+            if (emptyStateGlobal) emptyStateGlobal.hidden = false;
+
+            if (!hasSkills) {
+              if (emptyStateTitle) emptyStateTitle.textContent = 'Aún no hay skills registradas en el catálogo.';
+              if (emptyStateMessage) emptyStateMessage.textContent = 'Agrega un repositorio para comenzar a poblar el dashboard.';
+            } else {
+              if (emptyStateTitle) emptyStateTitle.textContent = 'No hay repositorios activos disponibles.';
+              if (emptyStateMessage) emptyStateMessage.textContent = 'Activa o agrega un repositorio para calcular métricas.';
+            }
+            return;
+          }
+
+          if (dashboardContent) dashboardContent.hidden = false;
+          if (emptyStateGlobal) emptyStateGlobal.hidden = true;
+
+          initializeOptions();
+
+          if (frontFilter) frontFilter.addEventListener('change', applyDashboardFilters);
+          if (techFilter) techFilter.addEventListener('change', applyDashboardFilters);
+          if (repoFilter) repoFilter.addEventListener('change', applyDashboardFilters);
+
+          if (showAllTechButton) {
+            showAllTechButton.addEventListener('click', () => {
+              showAllTechnologies = !showAllTechnologies;
+              applyDashboardFilters();
+            });
+          }
+
+          applyDashboardFilters();
+        }
+
+        bootstrapDashboard();
+
+        window.clearDashboardCache = clearDashboardCache;
+        window.refreshDashboardMetrics = refreshDashboardMetrics;
+        window.clearDashboardFilters = clearDashboardFilters;
+      </script>
+    </>
+  ) : (
+    <section class="forbidden" aria-live="polite">
+      <h1>Acceso restringido</h1>
+      <p>No tienes permisos para visualizar el dashboard administrativo.</p>
+    </section>
+  )}
+
+  </div>
+
+  <style is:global>
+    #dashboard-content {
+      display: grid;
+      gap: 1rem;
+      animation: dashboard-fade-in 420ms ease both;
+      align-items: start;
+    }
+
+    .dashboard-page {
+      width: min(1240px, 100%);
+      margin: 0 auto;
+    }
+
+    .hero {
+      position: relative;
+      isolation: isolate;
+      overflow: clip;
+      background:
+        radial-gradient(circle at 12% 12%, color-mix(in srgb, var(--accent) 42%, transparent), transparent 34%),
+        radial-gradient(circle at 88% 4%, color-mix(in srgb, var(--accent-warm) 36%, transparent), transparent 36%),
+        linear-gradient(140deg, color-mix(in srgb, var(--panel) 92%, transparent), color-mix(in srgb, var(--panel-elevated) 94%, transparent));
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2.2rem;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.4rem;
+      box-shadow: var(--shadow-soft);
+      margin: 0 0 15px;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: auto -10% -65% auto;
+      width: 320px;
+      height: 320px;
+      border-radius: 999px;
+      background: radial-gradient(circle at center, color-mix(in srgb, var(--accent) 22%, transparent), transparent 68%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: var(--login-eyebrow);
+      margin: 0 0 0.4rem;
+    }
+
+    .dashboard-page h1 {
+      margin: 0;
+      font-size: clamp(1.9rem, 3.3vw, 2.7rem);
+      letter-spacing: -0.03em;
+      line-height: 1.06;
+      text-wrap: balance;
+    }
+
+    .lede {
+      color: var(--muted);
+      margin: 0.72rem 0 0.95rem;
+      max-width: 66ch;
+      line-height: 1.55;
+    }
+
+    .meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.84rem;
+      letter-spacing: 0.01em;
+    }
+
+    .admin-actions {
+      background: linear-gradient(180deg, color-mix(in srgb, var(--panel-elevated) 90%, transparent), color-mix(in srgb, var(--panel) 88%, transparent));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.05rem;
+      display: grid;
+      gap: 0.6rem;
+      align-self: center;
+      box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 26%, transparent);
+    }
+
+    .admin-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.35;
+    }
+
+    .admin-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      min-height: 38px;
+      padding: 0.62rem 1rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      text-decoration: none;
+      font-weight: 750;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      box-shadow: 0 8px 20px color-mix(in srgb, #102033 10%, transparent);
+      transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .admin-action:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px color-mix(in srgb, #102033 18%, transparent);
+    }
+
+    .admin-action--primary {
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 38%, transparent), color-mix(in srgb, var(--accent-warm) 28%, transparent));
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+    }
+
+    .admin-action--secondary {
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.85rem;
+    }
+
+    .kpi-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background:
+        linear-gradient(185deg, color-mix(in srgb, var(--panel-elevated) 94%, transparent), color-mix(in srgb, var(--panel) 90%, transparent));
+      padding: 1rem 1rem 0.95rem;
+      display: grid;
+      gap: 0.3rem;
+      min-height: 134px;
+      align-content: start;
+      box-shadow: var(--shadow-soft);
+      transition: transform 180ms ease, border-color 180ms ease;
+      animation: dashboard-rise 360ms ease both;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+    }
+
+    .kpi-label {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.35;
+      font-weight: 600;
+    }
+
+    .kpi-value {
+      margin: 0;
+      color: var(--text);
+      font-size: clamp(1.3rem, 2vw, 1.78rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      text-wrap: balance;
+    }
+
+    .kpi-value--compact {
+      font-size: clamp(1.02rem, 1.55vw, 1.28rem);
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .kpi-help {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.35;
+      max-width: 30ch;
+    }
+
+    .kpi-meter {
+      position: relative;
+      height: 8px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--panel) 65%, var(--border));
+      overflow: hidden;
+      margin-top: 0.08rem;
+    }
+
+    .kpi-meter span {
+      display: block;
+      height: 100%;
+      width: 8%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 90%, transparent), color-mix(in srgb, var(--accent-warm) 72%, transparent));
+      transition: width 360ms ease;
+    }
+
+    .filters {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--panel-elevated) 90%, transparent), color-mix(in srgb, var(--panel) 88%, transparent));
+      padding: 1.05rem;
+      display: grid;
+      gap: 0.7rem;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .filters h2 {
+      margin: 0;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+
+    .filter-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+
+    .filter-grid label {
+      display: grid;
+      gap: 0.38rem;
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .filter-grid select {
+      width: 100%;
+      padding: 0.72rem 0.8rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--input-bg) 92%, transparent);
+      color: var(--text);
+      font-size: 0.92rem;
+      transition: border-color 140ms ease, box-shadow 140ms ease;
+    }
+
+    .filter-grid select:focus-visible {
+      outline: none;
+      border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+    }
+
+    .filter-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .distribution-grid {
+      display: grid;
+      gap: 0.8rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: stretch;
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--panel-elevated) 92%, transparent), color-mix(in srgb, var(--panel) 90%, transparent));
+      padding: 0.92rem;
+      display: grid;
+      gap: 0.62rem;
+      align-content: start;
+      box-shadow: var(--shadow-soft);
+      animation: dashboard-rise 420ms ease both;
+    }
+
+    .panel-head h3 {
+      margin: 0;
+      font-size: 1.02rem;
+      letter-spacing: -0.01em;
+    }
+
+    .panel-head p {
+      margin: 0.35rem 0 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.35;
+    }
+
+    .list-rows {
+      display: grid;
+      gap: 0.42rem;
+    }
+
+    .panel-chart {
+      border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      padding: 0.72rem;
+    }
+
+    .donut-wrap {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.85rem;
+      align-items: center;
+    }
+
+    .donut-wrap svg {
+      width: 126px;
+      height: 126px;
+      transform: rotate(-90deg);
+    }
+
+    .donut-label {
+      font-size: 18px;
+      font-weight: 800;
+      fill: var(--text);
+      transform: rotate(90deg);
+      transform-origin: center;
+    }
+
+    .donut-legend {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.35rem;
+      font-size: 0.82rem;
+    }
+
+    .donut-legend li {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 0.45rem;
+      color: var(--muted);
+    }
+
+    .donut-legend strong {
+      color: var(--text);
+      font-size: 0.8rem;
+    }
+
+    .donut-legend .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      display: inline-block;
+      box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 12%, transparent);
+    }
+
+    .tech-bar-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(120px, 1.8fr) auto;
+      align-items: center;
+      gap: 0.55rem;
+      font-size: 0.82rem;
+      margin-bottom: 0.45rem;
+    }
+
+    .tech-bar-row p {
+      margin: 0;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tech-bar-row strong {
+      font-size: 0.78rem;
+      color: var(--text);
+    }
+
+    .tech-bar-track {
+      height: 8px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--panel) 65%, var(--border));
+      overflow: hidden;
+    }
+
+    .tech-bar-track span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, color-mix(in srgb, #4e88ff 88%, transparent), color-mix(in srgb, #22c7b6 80%, transparent));
+    }
+
+    .list-row {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      background: color-mix(in srgb, var(--panel) 90%, transparent);
+      color: var(--text);
+      padding: 0.52rem 0.62rem;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
+    }
+
+    .list-row:hover {
+      transform: translateY(-1px);
+      border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+      background: color-mix(in srgb, var(--panel-elevated) 96%, transparent);
+    }
+
+    .list-row__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.6rem;
+      font-size: 0.82rem;
+    }
+
+    .list-row__head strong {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .list-row__bar {
+      margin-top: 0.36rem;
+      height: 7px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--panel) 62%, transparent);
+      overflow: hidden;
+    }
+
+    .list-row__bar span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 88%, transparent), color-mix(in srgb, var(--accent) 42%, transparent));
+    }
+
+    .list-row--compact {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.88rem;
+    }
+
+    .link-button {
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 0.5rem 0.75rem;
+      cursor: pointer;
+      justify-self: end;
+      transition: transform 140ms ease, border-color 140ms ease;
+    }
+
+    .link-button:hover {
+      transform: translateY(-1px);
+      border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+    }
+
+    .detail-panel {
+      position: relative;
+      overflow: clip;
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 20%, transparent);
+    }
+
+    .skills-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 980px;
+    }
+
+    .skills-table th,
+    .skills-table td {
+      border-bottom: 1px solid var(--border);
+      padding: 0.58rem 0.52rem;
+      text-align: left;
+      vertical-align: top;
+      font-size: 0.82rem;
+    }
+
+    .skills-table tbody tr:nth-child(even) {
+      background: color-mix(in srgb, var(--panel-elevated) 55%, transparent);
+    }
+
+    .skills-table tbody tr:hover {
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+    }
+
+    .skills-table th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: color-mix(in srgb, var(--panel-elevated) 96%, transparent);
+      color: var(--muted);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+    }
+
+    .skills-table a {
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 680;
+      text-underline-offset: 3px;
+    }
+
+    .skills-table td:first-child a {
+      display: inline-block;
+      max-width: 42ch;
+      line-height: 1.3;
+    }
+
+    .skills-table a:hover {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: 0.13rem 0.44rem;
+      font-size: 0.68rem;
+      font-weight: 600;
+      margin: 0 0.2rem 0.2rem 0;
+      white-space: nowrap;
+      background: color-mix(in srgb, var(--panel) 90%, transparent);
+    }
+
+    .row-metrics {
+      display: grid;
+      gap: 0.22rem;
+      min-width: 160px;
+    }
+
+    .row-metric {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.64rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .row-metric strong {
+      font-size: 0.68rem;
+      color: var(--text);
+      letter-spacing: 0;
+    }
+
+    .mini-track {
+      height: 6px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--panel) 60%, var(--border));
+      overflow: hidden;
+      min-width: 70px;
+    }
+
+    .mini-track span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 92%, transparent), color-mix(in srgb, #4e88ff 82%, transparent));
+    }
+
+    .mini-track--tech span {
+      background: linear-gradient(90deg, color-mix(in srgb, #ffad49 90%, transparent), color-mix(in srgb, #ef6f8c 76%, transparent));
+    }
+
+    .badge--front {
+      border-color: color-mix(in srgb, var(--accent) 48%, transparent);
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+    }
+
+    .badge--frontend {
+      border-color: color-mix(in srgb, #28b6ff 48%, transparent);
+      background: color-mix(in srgb, #28b6ff 18%, transparent);
+    }
+
+    .badge--backend {
+      border-color: color-mix(in srgb, #5bc16c 52%, transparent);
+      background: color-mix(in srgb, #5bc16c 16%, transparent);
+    }
+
+    .badge--devops {
+      border-color: color-mix(in srgb, #ff9f3f 52%, transparent);
+      background: color-mix(in srgb, #ff9f3f 16%, transparent);
+    }
+
+    .badge--security {
+      border-color: color-mix(in srgb, #ff6f6f 54%, transparent);
+      background: color-mix(in srgb, #ff6f6f 16%, transparent);
+    }
+
+    .badge--cloud {
+      border-color: color-mix(in srgb, #8a94ff 50%, transparent);
+      background: color-mix(in srgb, #8a94ff 16%, transparent);
+    }
+
+    .badge--data {
+      border-color: color-mix(in srgb, #00b8a6 52%, transparent);
+      background: color-mix(in srgb, #00b8a6 16%, transparent);
+    }
+
+    .badge--qa {
+      border-color: color-mix(in srgb, #ffb454 54%, transparent);
+      background: color-mix(in srgb, #ffb454 16%, transparent);
+    }
+
+    .badge--ai {
+      border-color: color-mix(in srgb, #00d4ff 50%, transparent);
+      background: color-mix(in srgb, #00d4ff 16%, transparent);
+    }
+
+    .badge--mobile {
+      border-color: color-mix(in srgb, #f68fd2 52%, transparent);
+      background: color-mix(in srgb, #f68fd2 18%, transparent);
+    }
+
+    .badge--otros {
+      border-color: color-mix(in srgb, var(--muted) 48%, transparent);
+      background: color-mix(in srgb, var(--muted) 18%, transparent);
+    }
+
+    .badge--tech {
+      border-color: var(--border-strong);
+      background: color-mix(in srgb, var(--panel-elevated) 90%, transparent);
+      color: color-mix(in srgb, var(--text) 88%, var(--muted));
+    }
+
+    .badge--status-active {
+      border-color: rgba(61, 217, 196, 0.6);
+      background: rgba(61, 217, 196, 0.14);
+    }
+
+    .badge--status-inactive {
+      border-color: rgba(180, 40, 69, 0.45);
+      background: rgba(180, 40, 69, 0.16);
+    }
+
+    .empty-state {
+      margin-top: 1rem;
+      padding: 1.1rem;
+      border-radius: 14px;
+      border: 1px dashed var(--border-strong);
+      background: color-mix(in srgb, var(--panel) 90%, transparent);
+    }
+
+    .empty-state h2 {
+      margin: 0;
+      font-size: 1.12rem;
+    }
+
+    .empty-state p {
+      margin: 0.5rem 0 0;
+      color: var(--muted);
+    }
+
+    .empty-inline {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .empty-results {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .forbidden {
+      margin: 0;
+      padding: 1.1rem;
+      border-radius: 14px;
+      border: 1px dashed var(--border-strong);
+      background: color-mix(in srgb, var(--panel) 90%, transparent);
+      max-width: 720px;
+    }
+
+    .forbidden p {
+      margin: 0.5rem 0 0;
+      color: var(--muted);
+    }
+
+    @media (max-width: 980px) {
+      .hero {
+        grid-template-columns: 1fr;
+        padding: 1.45rem;
+      }
+
+      .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .distribution-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .donut-wrap {
+        grid-template-columns: 1fr;
+        justify-items: center;
+      }
+
+      .donut-legend {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .dashboard-page {
+        width: 100%;
+      }
+
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        border-radius: 16px;
+      }
+
+      .dashboard-page h1 {
+        font-size: clamp(1.55rem, 8vw, 2rem);
+      }
+
+      .filter-actions {
+        justify-content: stretch;
+      }
+
+      .filter-actions .admin-action,
+      .admin-actions .admin-action {
+        width: 100%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #dashboard-content,
+      .kpi-card,
+      .panel {
+        animation: none;
+      }
+
+      .admin-action,
+      .kpi-card,
+      .list-row,
+      .link-button {
+        transition: none;
+      }
+    }
+
+    @keyframes dashboard-fade-in {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes dashboard-rise {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
 </Layout>
